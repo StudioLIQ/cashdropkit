@@ -552,7 +552,7 @@ A ticket can be marked DONE only when:
 
 ## 5) Phase 4 — Airdrop Planner / Simulation
 
-### [ ] T-0401 AirdropCampaign CRUD + list/detail UI
+### [x] T-0401 AirdropCampaign CRUD + list/detail UI — DONE
 
 **Goal:** Create and persist campaigns.
 
@@ -566,6 +566,37 @@ A ticket can be marked DONE only when:
 
 - create campaign → appears in list
 - reload preserves everything
+
+**Completion Details:**
+
+- Changed files: 19 files (2 modified, 17 created)
+- Created files:
+  - `src/core/airdrop/types.ts` — Airdrop types (CampaignStatus, WizardStepInfo, CreateCampaignInput)
+  - `src/core/airdrop/airdropService.ts` — Campaign CRUD + status derivation + wizard logic
+  - `src/core/airdrop/index.ts` — Module exports
+  - `src/stores/airdropStore.ts` — Zustand store for campaign state management
+  - `src/ui/components/airdrop/CampaignListCard.tsx` — Campaign card with status badges
+  - `src/ui/components/airdrop/CreateCampaignModal.tsx` — Modal to create new campaign
+  - `src/ui/components/airdrop/WizardStepper.tsx` — 7-step wizard navigation
+  - `src/ui/components/airdrop/wizard/*.tsx` — Wizard step components (Basics, Token, Recipients, Funding, Simulation, Execute, Report)
+  - `src/app/(app)/airdrops/[id]/page.tsx` — Campaign detail page with wizard UI
+- Modified files:
+  - `src/app/(app)/airdrops/page.tsx` — Integrated with airdropStore
+  - `src/stores/index.ts` — Export airdropStore
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (4 warnings, 0 errors)
+  - `pnpm format` — passed
+  - `pnpm test` — passed (239 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Airdrops list page shows campaigns with status badges
+  - [x] Create campaign modal creates campaign and redirects to detail
+  - [x] Campaign detail page shows wizard stepper
+  - [x] Wizard steps are accessible based on campaign state
+  - [x] Campaign data persists across reload (IndexedDB)
+  - [x] Active campaign state updates on name/token changes
+- Commit: 8092294d84e3d439d08969a086f58fabf0dcca17
 
 ### [ ] T-0402 Planner (batching + fee/dust estimation)
 
