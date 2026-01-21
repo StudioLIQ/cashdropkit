@@ -1,6 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie';
 
-import type { AirdropCampaign, AppSettings, LogEntry, VestingCampaign, Wallet } from './types';
+import type {
+  AirdropCampaign,
+  AppSettings,
+  LogEntry,
+  TokenMetadataCache,
+  VestingCampaign,
+  Wallet,
+} from './types';
 
 /**
  * CashDrop Kit Database
@@ -14,6 +21,7 @@ export class CashDropDatabase extends Dexie {
   vestingCampaigns!: EntityTable<VestingCampaign, 'id'>;
   logs!: EntityTable<LogEntry, 'id'>;
   settings!: EntityTable<AppSettings, 'id'>;
+  tokenMetadata!: EntityTable<TokenMetadataCache, 'id'>;
 
   constructor() {
     super('CashDropKit');
@@ -36,12 +44,27 @@ export class CashDropDatabase extends Dexie {
       settings: 'id',
     });
 
+    // Version 2: Add token metadata cache
+    this.version(2).stores({
+      // Keep existing tables unchanged
+      wallets: 'id, name, network, createdAt, type',
+      airdropCampaigns: 'id, name, network, createdAt, updatedAt, [execution.state]',
+      vestingCampaigns: 'id, name, network, createdAt, updatedAt',
+      logs: '++id, timestamp, level, category, campaignId',
+      settings: 'id',
+
+      // New: Token metadata cache
+      // id = tokenId:network composite key
+      tokenMetadata: 'id, tokenId, network, symbol, fetchedAt, expiresAt',
+    });
+
     // Type mappings for TypeScript
     this.wallets.mapToClass(Object as unknown as new () => Wallet);
     this.airdropCampaigns.mapToClass(Object as unknown as new () => AirdropCampaign);
     this.vestingCampaigns.mapToClass(Object as unknown as new () => VestingCampaign);
     this.logs.mapToClass(Object as unknown as new () => LogEntry);
     this.settings.mapToClass(Object as unknown as new () => AppSettings);
+    this.tokenMetadata.mapToClass(Object as unknown as new () => TokenMetadataCache);
   }
 }
 

@@ -282,3 +282,34 @@ export interface AppSettings {
   lastActiveWalletId?: string;
   updatedAt: number;
 }
+
+// ============================================================================
+// Token Metadata Cache
+// ============================================================================
+
+export interface TokenMetadataCache {
+  /** Composite key: tokenId:network (e.g., "abc123:mainnet") */
+  id: string;
+  tokenId: string;
+  network: Network;
+
+  /** Metadata fields (all optional as they may not be available) */
+  symbol?: string;
+  name?: string;
+  decimals?: number;
+  description?: string;
+  iconUrl?: string;
+
+  /** Source of the metadata (e.g., 'bcmr', 'otr', 'manual') */
+  source: 'bcmr' | 'otr' | 'manual' | 'unknown';
+
+  /** Whether the token is verified by a trusted registry */
+  verified: boolean;
+
+  /** Cache management */
+  fetchedAt: number;
+  expiresAt: number;
+
+  /** If fetch failed, store error for debugging */
+  fetchError?: string;
+}

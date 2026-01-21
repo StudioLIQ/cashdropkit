@@ -10,3 +10,4 @@ export {
   type HealthCheckResult,
   getStatusInfo,
 } from './connectionStore';
+export { useTokenStore, type TokenState } from './tokenStore';

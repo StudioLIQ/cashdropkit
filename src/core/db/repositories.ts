@@ -5,6 +5,7 @@ import type {
   LogEntry,
   LogLevel,
   Network,
+  TokenMetadataCache,
   VestingCampaign,
   Wallet,
 } from './types';
@@ -248,5 +249,109 @@ export const settingsRepo = {
       ...DEFAULT_SETTINGS,
       updatedAt: Date.now(),
     });
+  },
+};
+
+// ============================================================================
+// Token Metadata Cache Repository
+// ============================================================================
+
+/** Default cache TTL: 24 hours */
+const TOKEN_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Create composite key for token metadata cache
+ */
+function makeTokenCacheKey(tokenId: string, network: Network): string {
+  return `${tokenId}:${network}`;
+}
+
+export const tokenMetadataRepo = {
+  /**
+   * Get cached metadata for a token
+   * Returns undefined if not cached or if cache is expired
+   */
+  async get(tokenId: string, network: Network): Promise<TokenMetadataCache | undefined> {
+    const db = getDb();
+    const id = makeTokenCacheKey(tokenId, network);
+    const cached = await db.tokenMetadata.get(id);
+
+    if (!cached) {
+      return undefined;
+    }
+
+    // Check if expired
+    if (cached.expiresAt < Date.now()) {
+      return undefined;
+    }
+
+    return cached;
+  },
+
+  /**
+   * Store metadata in cache
+   */
+  async set(
+    tokenId: string,
+    network: Network,
+    metadata: Omit<TokenMetadataCache, 'id' | 'tokenId' | 'network' | 'fetchedAt' | 'expiresAt'>,
+    ttlMs: number = TOKEN_CACHE_TTL_MS
+  ): Promise<void> {
+    const db = getDb();
+    const now = Date.now();
+    const cacheEntry: TokenMetadataCache = {
+      id: makeTokenCacheKey(tokenId, network),
+      tokenId,
+      network,
+      ...metadata,
+      fetchedAt: now,
+      expiresAt: now + ttlMs,
+    };
+    await db.tokenMetadata.put(cacheEntry);
+  },
+
+  /**
+   * Delete a specific token from cache
+   */
+  async delete(tokenId: string, network: Network): Promise<void> {
+    const db = getDb();
+    const id = makeTokenCacheKey(tokenId, network);
+    await db.tokenMetadata.delete(id);
+  },
+
+  /**
+   * Get all cached tokens for a network
+   */
+  async getAllByNetwork(network: Network): Promise<TokenMetadataCache[]> {
+    const db = getDb();
+    return db.tokenMetadata.where('network').equals(network).toArray();
+  },
+
+  /**
+   * Clear all expired cache entries
+   */
+  async clearExpired(): Promise<number> {
+    const db = getDb();
+    return db.tokenMetadata.where('expiresAt').below(Date.now()).delete();
+  },
+
+  /**
+   * Clear all cache entries
+   */
+  async clearAll(): Promise<void> {
+    const db = getDb();
+    await db.tokenMetadata.clear();
+  },
+
+  /**
+   * Search tokens by symbol (case-insensitive partial match)
+   */
+  async searchBySymbol(symbol: string, network: Network): Promise<TokenMetadataCache[]> {
+    const db = getDb();
+    const lowerSymbol = symbol.toLowerCase();
+    const all = await db.tokenMetadata.where('network').equals(network).toArray();
+    return all.filter(
+      (t) => t.symbol && t.symbol.toLowerCase().includes(lowerSymbol) && t.expiresAt > Date.now()
+    );
   },
 };

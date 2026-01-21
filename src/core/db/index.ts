@@ -2,7 +2,14 @@
 export { CashDropDatabase, closeDb, deleteDb, getDb } from './db';
 
 // Repositories
-export { airdropRepo, logRepo, settingsRepo, vestingRepo, walletRepo } from './repositories';
+export {
+  airdropRepo,
+  logRepo,
+  settingsRepo,
+  tokenMetadataRepo,
+  vestingRepo,
+  walletRepo,
+} from './repositories';
 
 // Types
 export type {
@@ -22,6 +29,7 @@ export type {
   OutpointRef,
   RecipientRow,
   RecipientStatus,
+  TokenMetadataCache,
   TokenRef,
   TrancheRow,
   TrancheStatus,
