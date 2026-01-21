@@ -113,7 +113,7 @@ A ticket can be marked DONE only when:
 
 **Completion Details:**
 
-- Changed files: package.json, pnpm-lock.yaml, src/core/db/*
+- Changed files: package.json, pnpm-lock.yaml, src/core/db/\*
 - Created files:
   - `src/core/db/types.ts` — Domain types (Wallet, AirdropCampaign, VestingCampaign, etc.)
   - `src/core/db/db.ts` — Dexie database class with schema v1
@@ -133,7 +133,7 @@ A ticket can be marked DONE only when:
   - [x] BigInt stored as string for IndexedDB compatibility
 - Commit: 6238a8396343341d0e305a48925a4cf4750cc702
 
-### [ ] T-0102 BigInt JSON serialization (replacer/reviver)
+### [x] T-0102 BigInt JSON serialization (replacer/reviver) — DONE
 
 **Goal:** BigInt-safe persistence and export/import.
 
@@ -145,6 +145,27 @@ A ticket can be marked DONE only when:
 **Acceptance:**
 
 - bigint fields round-trip without loss
+
+**Completion Details:**
+
+- Changed files: package.json, pnpm-lock.yaml, tsconfig.json, vitest.config.mts
+- Created files:
+  - `src/core/util/bigintJson.ts` — BigInt JSON serialization with replacer/reviver
+  - `src/core/util/bigintJson.test.ts` — 34 unit tests for round-trip verification
+  - `src/core/util/index.ts` — Public exports
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed
+  - `pnpm test` — passed (34 tests)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] BigInt values round-trip through JSON without loss
+  - [x] Very large BigInt values (30+ digits) serialize correctly
+  - [x] Negative BigInt values handled correctly
+  - [x] Display ↔ base conversion with decimals works correctly
+  - [x] Rounding modes (floor/round/ceil) work as expected
+- Commit: 0c79ec03e1c068039c640ec57b1a5ada5b277236
 
 ### [ ] T-0103 App lock + AES-GCM encrypted secret storage
 
