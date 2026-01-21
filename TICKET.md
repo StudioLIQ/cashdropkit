@@ -167,7 +167,7 @@ A ticket can be marked DONE only when:
   - [x] Rounding modes (floor/round/ceil) work as expected
 - Commit: 0c79ec03e1c068039c640ec57b1a5ada5b277236
 
-### [ ] T-0103 App lock + AES-GCM encrypted secret storage
+### [x] T-0103 App lock + AES-GCM encrypted secret storage — DONE
 
 **Goal:** Encrypt mnemonic/private materials at rest.
 
@@ -182,6 +182,29 @@ A ticket can be marked DONE only when:
 
 - secrets cannot be decrypted without passphrase
 - auto-lock triggers reliably
+
+**Completion Details:**
+
+- Created files:
+  - `src/core/crypto/kdf.ts` — PBKDF2 key derivation (SHA-256, 100k iterations)
+  - `src/core/crypto/aes.ts` — AES-256-GCM encrypt/decrypt with random IV
+  - `src/core/crypto/lock.ts` — AppLockManager with auto-lock timer
+  - `src/core/crypto/index.ts` — Public exports
+  - `src/core/crypto/crypto.test.ts` — 42 unit tests
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed
+  - `pnpm test` — passed (76 total: 34 bigint + 42 crypto)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Secrets cannot be decrypted without correct passphrase
+  - [x] Auto-lock triggers after configured idle time
+  - [x] Activity resets auto-lock timer
+  - [x] Passphrase change works correctly
+  - [x] Round-trip encryption/decryption preserves data
+- Note: Settings UI for lock config deferred to T-0104 wallet UI (will integrate there)
+- Commit: 76baba77946cd1cb87393fe144eedcf246555e16
 
 ### [ ] T-0104 Wallet domain + mnemonic wallet create/import UI
 
