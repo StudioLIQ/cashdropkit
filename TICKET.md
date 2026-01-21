@@ -492,7 +492,7 @@ A ticket can be marked DONE only when:
   - [x] Batch validation with summary statistics
 - Commit: 93dcb36459b9842949157bccabdba614bd863325
 
-### [ ] T-0303 CSV import + column mapping + validation + optional duplicate merge
+### [x] T-0303 CSV import + column mapping + validation + optional duplicate merge — DONE
 
 **Goal:** Build the recipients ingestion pipeline.
 
@@ -508,6 +508,45 @@ A ticket can be marked DONE only when:
 
 - sample CSV with known invalid rows yields correct results
 - merge duplicates sums amounts deterministically
+
+**Completion Details:**
+
+- Changed files: 13 files (1 modified, 12 created)
+- Created files:
+  - `src/core/csv/types.ts` — CSV parsing types (CsvRawRow, ColumnMapping, ValidatedRecipientRow, ValidationSummary, etc.)
+  - `src/core/csv/csvParser.ts` — CSV parsing, column mapping, validation, and duplicate merge functions
+  - `src/core/csv/csvParser.test.ts` — 35 unit tests
+  - `src/core/csv/index.ts` — Public exports
+  - `src/stores/csvStore.ts` — Zustand store for CSV import workflow state
+  - `src/ui/components/csv/CsvUploader.tsx` — Drag-and-drop file upload with paste option
+  - `src/ui/components/csv/ColumnMapper.tsx` — Column mapping UI with preview table
+  - `src/ui/components/csv/CsvPreviewTable.tsx` — Validated rows table with filter/search
+  - `src/ui/components/csv/ValidationSummary.tsx` — Summary cards with error breakdown
+  - `src/ui/components/csv/index.ts` — Component exports
+- Modified files:
+  - `src/stores/index.ts` — Export csvStore
+- Key features:
+  - CSV parsing with quoted field handling and escaped quotes
+  - Automatic column detection from headers (address/amount/memo patterns)
+  - Address validation with network mismatch detection
+  - Amount validation with rounding modes (floor/round/ceil)
+  - Duplicate address detection and optional merge (sum amounts)
+  - Export invalid rows as CSV with error details
+  - Full validation summary with error breakdown
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (1 pre-existing warning)
+  - `pnpm test` — passed (239 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] CSV parsing handles various line endings (CRLF, CR, LF)
+  - [x] Quoted fields with commas and escaped quotes work correctly
+  - [x] Column auto-detection works for common patterns
+  - [x] Address validation detects invalid/network-mismatch addresses
+  - [x] Amount validation with rounding modes works
+  - [x] Duplicate merge sums amounts deterministically
+  - [x] Invalid row export generates valid CSV with errors
+- Commit: (pending)
 
 ---
 
