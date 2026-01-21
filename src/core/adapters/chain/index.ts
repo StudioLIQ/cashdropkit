@@ -48,6 +48,18 @@ export {
 } from './electrum';
 export type { ElectrumAdapterConfig } from './electrum';
 
+// Connection Service
+export {
+  ConnectionService,
+  getConnectionService,
+  resetConnectionService,
+} from './connectionService';
+export type {
+  ConnectionServiceConfig,
+  ConnectionEventListener,
+  HealthCheckResult,
+} from './connectionService';
+
 adapterRegistry.register('electrum', (config: ChainAdapterConfig) => {
   return createElectrumAdapter(config as ElectrumAdapterConfig);
 });

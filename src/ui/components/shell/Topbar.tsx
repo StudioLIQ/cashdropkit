@@ -4,33 +4,83 @@ import { useState } from 'react';
 
 import Link from 'next/link';
 
-export type ConnectionStatus = 'connected' | 'degraded' | 'offline';
-export type Network = 'mainnet' | 'testnet';
+import { type ConnectionStatus, getStatusInfo } from '@/stores/connectionStore';
+
+import type { Network } from '@/core/db/types';
 
 interface TopbarProps {
-  network?: Network;
-  connectionStatus?: ConnectionStatus;
+  network: Network;
+  connectionStatus: ConnectionStatus;
   walletLabel?: string;
+  isRetrying?: boolean;
+  lastError?: string | null;
   onNetworkChange?: (network: Network) => void;
+  onRetry?: () => void;
 }
 
-function ConnectionIndicator({ status }: { status: ConnectionStatus }) {
-  const colors: Record<ConnectionStatus, string> = {
-    connected: 'bg-emerald-500',
-    degraded: 'bg-amber-500',
-    offline: 'bg-red-500',
-  };
+function ConnectionIndicator({
+  status,
+  isRetrying,
+  lastError,
+  onRetry,
+}: {
+  status: ConnectionStatus;
+  isRetrying?: boolean;
+  lastError?: string | null;
+  onRetry?: () => void;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const statusInfo = getStatusInfo(status);
 
-  const labels: Record<ConnectionStatus, string> = {
-    connected: 'Connected',
-    degraded: 'Degraded',
-    offline: 'Offline',
-  };
+  const canRetry = (status === 'offline' || status === 'degraded') && !isRetrying;
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className={`h-2 w-2 rounded-full ${colors[status]}`} />
-      <span className="text-zinc-600 dark:text-zinc-400">{labels[status]}</span>
+    <div className="relative flex items-center gap-2">
+      <button
+        onClick={canRetry && onRetry ? onRetry : undefined}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        disabled={!canRetry}
+        className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors ${
+          canRetry ? 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800' : 'cursor-default'
+        }`}
+        title={canRetry ? 'Click to retry connection' : undefined}
+      >
+        {isRetrying ? (
+          <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+        ) : (
+          <span className={`h-2 w-2 rounded-full ${statusInfo.bgColor}`} />
+        )}
+        <span className={`${statusInfo.color}`}>
+          {isRetrying ? 'Connecting...' : statusInfo.label}
+        </span>
+        {canRetry && (
+          <svg
+            className="h-3 w-3 text-zinc-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        )}
+      </button>
+
+      {/* Tooltip with error details */}
+      {showTooltip && lastError && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-lg border border-zinc-200 bg-white p-3 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">Connection Error</div>
+          <div className="text-zinc-500 dark:text-zinc-400">{lastError}</div>
+          {canRetry && (
+            <div className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">Click to retry</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -38,15 +88,18 @@ function ConnectionIndicator({ status }: { status: ConnectionStatus }) {
 function NetworkSelector({
   network,
   onChange,
+  disabled,
 }: {
   network: Network;
   onChange: (n: Network) => void;
+  disabled?: boolean;
 }) {
   return (
     <select
       value={network}
       onChange={(e) => onChange(e.target.value as Network)}
-      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+      disabled={disabled}
+      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
     >
       <option value="testnet">Testnet (Chipnet)</option>
       <option value="mainnet">Mainnet</option>
@@ -55,18 +108,30 @@ function NetworkSelector({
 }
 
 export function Topbar({
-  network = 'testnet',
-  connectionStatus = 'connected',
+  network,
+  connectionStatus,
   walletLabel,
+  isRetrying = false,
+  lastError,
   onNetworkChange,
+  onRetry,
 }: TopbarProps) {
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center gap-4">
-        <NetworkSelector network={network} onChange={onNetworkChange || (() => {})} />
-        <ConnectionIndicator status={connectionStatus} />
+        <NetworkSelector
+          network={network}
+          onChange={onNetworkChange || (() => {})}
+          disabled={isRetrying}
+        />
+        <ConnectionIndicator
+          status={connectionStatus}
+          isRetrying={isRetrying}
+          lastError={lastError}
+          onRetry={onRetry}
+        />
       </div>
 
       <div className="flex items-center gap-4">
@@ -145,3 +210,6 @@ export function Topbar({
     </header>
   );
 }
+
+// Re-export types for convenience
+export type { ConnectionStatus, Network };
