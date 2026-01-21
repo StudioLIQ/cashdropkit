@@ -1,3 +1,9 @@
+// Register Electrum adapter in global registry
+import { adapterRegistry } from './ChainAdapter';
+import { createElectrumAdapter } from './electrum';
+import type { ElectrumAdapterConfig } from './electrum';
+import type { ChainAdapterConfig } from './types';
+
 /**
  * Chain Adapter Module Exports
  */
@@ -32,3 +38,16 @@ export {
 // Interface
 export type { ChainAdapter, ChainAdapterFactory, ChainAdapterRegistry } from './ChainAdapter';
 export { adapterRegistry, createAdapterRegistry } from './ChainAdapter';
+
+// Electrum Adapter
+export {
+  ElectrumAdapter,
+  ElectrumClient,
+  createElectrumAdapter,
+  DEFAULT_ELECTRUM_ENDPOINTS,
+} from './electrum';
+export type { ElectrumAdapterConfig } from './electrum';
+
+adapterRegistry.register('electrum', (config: ChainAdapterConfig) => {
+  return createElectrumAdapter(config as ElectrumAdapterConfig);
+});

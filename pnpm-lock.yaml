@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@bitauth/libauth':
+        specifier: ^3.0.0
+        version: 3.0.0
       '@scure/bip32':
         specifier: ^2.0.1
         version: 2.0.1
@@ -145,6 +148,10 @@ packages:
   '@babel/types@7.28.6':
     resolution: {integrity: sha512-0ZrskXVEHSWIqZM/sQZ4EV3jZJXRkio/WCxaqKZP1g//CEWEPSfeZFcms4XeKBCHU0ZKnIkdJeU/kF+eRp5lBg==}
     engines: {node: '>=6.9.0'}
+
+  '@bitauth/libauth@3.0.0':
+    resolution: {integrity: sha512-3yoL31XpnhAnf5nDVMFk4xPqebxDwXrgYAwpa31ARJnV5A/eXWlpNYvCd6FTZPFM4VvKfjCBi+jRCrw1hOZ0Jg==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   '@emnapi/core@1.8.1':
     resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
@@ -2606,6 +2613,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
+
+  '@bitauth/libauth@3.0.0': {}
 
   '@emnapi/core@1.8.1':
     dependencies:
