@@ -1,0 +1,35 @@
+// Database instance
+export { CashDropDatabase, closeDb, deleteDb, getDb } from './db';
+
+// Repositories
+export { airdropRepo, logRepo, settingsRepo, vestingRepo, walletRepo } from './repositories';
+
+// Types
+export type {
+  AirdropCampaign,
+  AirdropFunding,
+  AirdropSettings,
+  AppSettings,
+  BatchPlan,
+  BeneficiaryRow,
+  ConfirmationStatus,
+  DistributionPlan,
+  ExecutionState,
+  ExecutionStatus,
+  LogEntry,
+  LogLevel,
+  Network,
+  OutpointRef,
+  RecipientRow,
+  RecipientStatus,
+  TokenRef,
+  TrancheRow,
+  TrancheStatus,
+  VestingCampaign,
+  VestingPlan,
+  VestingSettings,
+  Wallet,
+} from './types';
+
+// Migrations and utilities
+export { exportAllData, getCurrentVersion, getDbStats, verifyDatabase } from './migrations';
