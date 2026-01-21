@@ -206,7 +206,7 @@ A ticket can be marked DONE only when:
 - Note: Settings UI for lock config deferred to T-0104 wallet UI (will integrate there)
 - Commit: 76baba77946cd1cb87393fe144eedcf246555e16
 
-### [ ] T-0104 Wallet domain + mnemonic wallet create/import UI
+### [x] T-0104 Wallet domain + mnemonic wallet create/import UI — DONE
 
 **Goal:** Users can create/import/select active wallet.
 
@@ -221,6 +221,38 @@ A ticket can be marked DONE only when:
 
 - active wallet selection persists across reload
 - mnemonic stored encrypted
+
+**Completion Details:**
+
+- Changed files: package.json, pnpm-lock.yaml, src/app/(app)/wallets/page.tsx
+- Created files:
+  - `src/core/wallet/types.ts` — Wallet types and derivation constants
+  - `src/core/wallet/cashaddr.ts` — CashAddr encode/decode for BCH
+  - `src/core/wallet/mnemonic.ts` — BIP39 mnemonic + BIP32/BIP44 HD derivation
+  - `src/core/wallet/walletService.ts` — Wallet CRUD + encryption operations
+  - `src/core/wallet/wallet.test.ts` — 25 unit tests
+  - `src/core/wallet/index.ts` — Public exports
+  - `src/stores/walletStore.ts` — Zustand wallet state store
+  - `src/stores/index.ts` — Store exports
+  - `src/ui/components/wallet/WalletListCard.tsx` — Wallet list item
+  - `src/ui/components/wallet/CreateWalletModal.tsx` — 3-step create with backup
+  - `src/ui/components/wallet/ImportWalletModal.tsx` — Import existing mnemonic
+  - `src/ui/components/wallet/index.ts` — Component exports
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed
+  - `pnpm test` — passed (101 tests: 34 bigint + 42 crypto + 25 wallet)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Wallet list UI displays wallets with active indicator
+  - [x] Create wallet modal has 3-step flow (form → backup → confirm)
+  - [x] Import wallet validates mnemonic before saving
+  - [x] Mnemonic is encrypted with AES-256-GCM before storage
+  - [x] Active wallet selection persists (via settings.lastActiveWalletId)
+  - [x] Delete wallet requires confirmation
+  - [x] Watch-only skeleton available (createWatchOnlyWallet function)
+- Commit: 9669e55c56cbb80f8d6b8cd6f70bb7630fff4448
 
 ---
 
