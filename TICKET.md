@@ -31,7 +31,7 @@ A ticket can be marked DONE only when:
 
 ## 1) Phase 0 — Repo Bootstrap
 
-### [ ] T-0001 Repo bootstrap (Next.js + TS + lint/format + env)
+### [x] T-0001 Repo bootstrap (Next.js + TS + lint/format + env) — DONE
 
 **Goal:** Create the skeleton with stable dev ergonomics.
 
@@ -47,6 +47,23 @@ A ticket can be marked DONE only when:
 
 - `pnpm dev` (or npm) runs immediately
 - base layout renders
+
+**Completion Details:**
+
+- Changed files: 34 files (see commit d9fc89a)
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed
+  - `pnpm build` — passed (all routes generated)
+  - `pnpm dev` — runs successfully on localhost:3000
+- Manual QA:
+  - [x] Dev server starts without errors
+  - [x] Root page redirects to /dashboard
+  - [x] Sidebar navigation works for all pages
+  - [x] Topbar network selector and connection status render
+  - [x] All pages (dashboard, airdrops, vesting, wallets, settings, claim) render
+- Commit: d9fc89adbac42df68b20df959e0a21339ae25250
 
 ### [ ] T-0002 Docs baseline (README + LICENSE + SECURITY.md)
 
