@@ -405,7 +405,7 @@ A ticket can be marked DONE only when:
 
 ## 4) Phase 3 — Token Metadata / Validation / CSV
 
-### [ ] T-0301 TokenId input + metadata lookup (best-effort)
+### [x] T-0301 TokenId input + metadata lookup (best-effort) — DONE
 
 **Goal:** Display symbol/name/decimals if available.
 
@@ -419,6 +419,37 @@ A ticket can be marked DONE only when:
 
 - campaigns can proceed even if metadata is missing
 - decimals always known before amount normalization
+
+**Completion Details:**
+
+- Changed files: 12 files (4 modified, 8 created)
+- Created files:
+  - `src/core/token/types.ts` — Token metadata types (TokenLookupResult, BcmrRegistry, OtrTokenEntry, etc.)
+  - `src/core/token/tokenService.ts` — TokenService for fetching metadata from BCMR/OTR registries with local cache
+  - `src/core/token/token.test.ts` — 24 unit tests for token service
+  - `src/core/token/index.ts` — Public exports
+  - `src/stores/tokenStore.ts` — Zustand store for token lookup state
+  - `src/ui/components/token/TokenLookupCard.tsx` — UI component for token lookup with manual decimals fallback
+  - `src/ui/components/token/index.ts` — Component exports
+- Modified files:
+  - `src/core/db/types.ts` — Added TokenMetadataCache type
+  - `src/core/db/db.ts` — Added tokenMetadata table (v2 schema migration)
+  - `src/core/db/repositories.ts` — Added tokenMetadataRepo for cache operations
+  - `src/core/db/index.ts` — Export tokenMetadataRepo and TokenMetadataCache
+  - `src/stores/index.ts` — Export tokenStore
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (1 warning: img element for external URLs)
+  - `pnpm test` — passed (155 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] TokenLookupCard accepts 64-char hex token ID
+  - [x] Fetches metadata from BCMR registry
+  - [x] Falls back to OTR registry when BCMR fails
+  - [x] Shows manual decimals input when metadata not found
+  - [x] Caches results in IndexedDB with TTL
+  - [x] Campaigns can proceed without metadata (requiresManualDecimals flag)
+- Commit: bca6c7a997db5508da22a2c326ea90e5f0238305
 
 ### [ ] T-0302 CashAddr normalize/validate module
 
