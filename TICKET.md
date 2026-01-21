@@ -65,7 +65,7 @@ A ticket can be marked DONE only when:
   - [x] All pages (dashboard, airdrops, vesting, wallets, settings, claim) render
 - Commit: d9fc89adbac42df68b20df959e0a21339ae25250
 
-### [ ] T-0002 Docs baseline (README + LICENSE + SECURITY.md)
+### [x] T-0002 Docs baseline (README + LICENSE + SECURITY.md) — DONE
 
 **Goal:** Minimum documentation required for demo/review.
 
@@ -79,6 +79,18 @@ A ticket can be marked DONE only when:
 
 - A reviewer can run locally without guessing
 - Clear statement: secrets never leave the client
+
+**Completion Details:**
+
+- Changed files: README.md, LICENSE, SECURITY.md
+- README includes: What/Why/How, Quick Start, Demo Walkthrough, Project Structure, Config, Tech Stack, MVP Scope
+- LICENSE: MIT License
+- SECURITY.md includes: Core principles, crypto implementation, threat model, provider trust assumptions, resume safety, auto-lock, backup/recovery, security checklist
+- Manual QA:
+  - [x] README has clear install/run steps
+  - [x] Security statement "Your keys never leave this device" present
+  - [x] SECURITY.md covers all required topics
+- Commit: ab3d231e531c6dc94093e0b3a12230b6491ebfda
 
 ---
 
