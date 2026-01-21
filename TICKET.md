@@ -546,7 +546,7 @@ A ticket can be marked DONE only when:
   - [x] Amount validation with rounding modes works
   - [x] Duplicate merge sums amounts deterministically
   - [x] Invalid row export generates valid CSV with errors
-- Commit: (pending)
+- Commit: f03c2581e0f5c840a9d537c822149b666a0f7803
 
 ---
 
