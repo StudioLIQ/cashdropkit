@@ -350,7 +350,7 @@ A ticket can be marked DONE only when:
   - [x] Uses existing cashaddr module for address-to-scripthash conversion
 - Commit: e9397640198a90ad6fc0fd20f03c86a1d0204683
 
-### [ ] T-0203 Connection status (Connected/Degraded/Offline)
+### [x] T-0203 Connection status (Connected/Degraded/Offline) — DONE
 
 **Goal:** Reflect provider instability in UX.
 
@@ -364,6 +364,42 @@ A ticket can be marked DONE only when:
 
 - offline mode clearly shown
 - actions fail gracefully with actionable error
+
+**Completion Details:**
+
+- Changed files: 4 modified, 3 created
+- Created files:
+  - `src/core/adapters/chain/connectionService.ts` — ConnectionService class with health checks, retry, and adapter lifecycle
+  - `src/core/adapters/chain/connectionService.test.ts` — 17 unit tests for connection service
+  - `src/stores/connectionStore.ts` — Zustand store for connection state (status, network, errors, retry)
+- Modified files:
+  - `src/core/adapters/chain/index.ts` — Export connection service
+  - `src/stores/index.ts` — Export connection store
+  - `src/ui/components/shell/Topbar.tsx` — Clickable status indicator with retry controls and error tooltip
+  - `src/ui/components/shell/AppShell.tsx` — Wire up connection service and wallet loading
+- Features implemented:
+  - ConnectionService: singleton that manages ElectrumAdapter lifecycle
+  - Periodic health checks (30s interval, 5s timeout)
+  - Status calculation: connected (0-1 failures), degraded (2-4 failures), offline (5+ failures)
+  - Retry button when offline/degraded (click status indicator)
+  - Error tooltip showing last error message
+  - Network switching triggers reconnection
+  - Proper cleanup on unmount
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 0 warnings)
+  - `pnpm format` — passed
+  - `pnpm test` — passed (131 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Offline mode clearly shown (red indicator, "Offline" label)
+  - [x] Degraded mode shows amber indicator
+  - [x] Connected mode shows green indicator
+  - [x] Clicking offline/degraded status shows retry icon and triggers reconnection
+  - [x] Error tooltip appears on hover when there's an error
+  - [x] Network selector disabled during connection attempts
+  - [x] Actions fail gracefully with actionable error (tooltip shows error, retry available)
+- Commit: e75c4c863064e9e5b2cc9df38c3148b57df8afad
 
 ---
 
