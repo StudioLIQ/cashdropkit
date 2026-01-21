@@ -258,7 +258,7 @@ A ticket can be marked DONE only when:
 
 ## 3) Phase 2 — Chain Adapter (UTXO / Broadcast / Tx Status)
 
-### [ ] T-0201 ChainAdapter interface definition
+### [x] T-0201 ChainAdapter interface definition — DONE
 
 **Goal:** Fix provider abstraction before implementation.
 
@@ -270,6 +270,33 @@ A ticket can be marked DONE only when:
 **Acceptance:**
 
 - planners/executors depend only on interface, not provider details
+
+**Completion Details:**
+
+- Created files:
+  - `src/core/adapters/chain/types.ts` — Core types (Utxo, TokenUtxo, CashToken, TxStatus, BlockInfo, etc.)
+  - `src/core/adapters/chain/ChainAdapter.ts` — ChainAdapter interface + registry
+  - `src/core/adapters/chain/index.ts` — Public exports
+  - `src/core/adapters/index.ts` — Adapters module exports
+- Key types defined:
+  - Utxo, TokenUtxo, CashToken — UTXO representation
+  - TxStatus, TxStatusType — Transaction status tracking
+  - BlockInfo, ChainTip — Block/chain info
+  - AddressBalance, TokenBalance — Balance queries
+  - BroadcastResult — Transaction broadcast result
+  - ChainAdapterError — Typed errors with retryable flag
+- Interface methods: getUtxos, getBchUtxos, getTokenUtxos, getBalance, getTokenBalances, broadcast, getTxStatus, getRawTx, getChainTip, getBlock, getBlockByHash, isHealthy, estimateFeeRate
+- Commands run:
+  - `pnpm typecheck` — passed
+  - `pnpm lint` — passed
+  - `pnpm test` — passed (101 tests)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Interface defines all required methods for planner/executor
+  - [x] Types are provider-agnostic
+  - [x] Token UTXO properly extends base UTXO
+  - [x] Error types support retry classification
+- Commit: 78db4526803c12f5975cc8fc44fc7d688e8944e6
 
 ### [ ] T-0202 Implement 1 ChainAdapter (browser-friendly)
 
