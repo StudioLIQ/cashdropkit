@@ -298,7 +298,7 @@ A ticket can be marked DONE only when:
   - [x] Error types support retry classification
 - Commit: 78db4526803c12f5975cc8fc44fc7d688e8944e6
 
-### [ ] T-0202 Implement 1 ChainAdapter (browser-friendly)
+### [x] T-0202 Implement 1 ChainAdapter (browser-friendly) — DONE
 
 **Goal:** UTXO fetch + broadcast + tx status for mainnet/testnet.
 
@@ -317,6 +317,38 @@ A ticket can be marked DONE only when:
 - address → UTXOs works
 - raw tx → broadcast works
 - txid → status works
+
+**Completion Details:**
+
+- Changed files: package.json, pnpm-lock.yaml, src/core/adapters/chain/index.ts
+- Created files:
+  - `src/core/adapters/chain/electrum/types.ts` — Electrum protocol types (JSON-RPC, UTXO, Token, Block)
+  - `src/core/adapters/chain/electrum/ElectrumClient.ts` — WebSocket JSON-RPC client with auto-reconnect
+  - `src/core/adapters/chain/electrum/ElectrumAdapter.ts` — Full ChainAdapter implementation
+  - `src/core/adapters/chain/electrum/electrum.test.ts` — Unit tests (16 tests, 3 skipped integration)
+  - `src/core/adapters/chain/electrum/index.ts` — Public exports
+- Features implemented:
+  - UTXO methods: getUtxos, getBchUtxos, getTokenUtxos (with CashTokens support)
+  - Balance methods: getBalance, getTokenBalances
+  - Transaction methods: broadcast, getTxStatus, getRawTx
+  - Block/chain methods: getChainTip, getBlock, getBlockByHash
+  - Health methods: isHealthy, estimateFeeRate
+  - Retry/backoff strategy for transient failures
+  - Automatic reconnection with exponential backoff
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 0 warnings)
+  - `pnpm test` — passed (114 tests, 3 skipped)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Interface methods match ChainAdapter contract
+  - [x] Private keys/mnemonic never transmitted (adapter only handles addresses/txhex)
+  - [x] Endpoints configurable via DEFAULT_ELECTRUM_ENDPOINTS
+  - [x] CashTokens token_data properly parsed from UTXO responses
+  - [x] Retry logic handles timeout/connection errors
+  - [x] Uses existing cashaddr module for address-to-scripthash conversion
+- Commit: e9397640198a90ad6fc0fd20f03c86a1d0204683
 
 ### [ ] T-0203 Connection status (Connected/Degraded/Offline)
 
