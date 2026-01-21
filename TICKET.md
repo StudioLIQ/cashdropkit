@@ -451,7 +451,7 @@ A ticket can be marked DONE only when:
   - [x] Campaigns can proceed without metadata (requiresManualDecimals flag)
 - Commit: bca6c7a997db5508da22a2c326ea90e5f0238305
 
-### [ ] T-0302 CashAddr normalize/validate module
+### [x] T-0302 CashAddr normalize/validate module — DONE
 
 **Goal:** Single canonical implementation for address handling.
 
@@ -464,6 +464,33 @@ A ticket can be marked DONE only when:
 
 - detects wrong-network addresses reliably
 - persists normalized address only
+
+**Completion Details:**
+
+- Created files:
+  - `src/core/util/validate.ts` — Address and amount validation with detailed errors
+  - `src/core/util/validate.test.ts` — 49 unit tests
+- Modified files:
+  - `src/core/util/index.ts` — Export validation utilities
+- Key features:
+  - `validateAddress()` with network mismatch detection
+  - `validateAmount()` with rounding modes (floor/round/ceil)
+  - `validateRecipient()` for single row validation
+  - `validateRecipientBatch()` for CSV batch validation
+  - Error types: EMPTY, INVALID_FORMAT, INVALID_CHECKSUM, NETWORK_MISMATCH, UNKNOWN_PREFIX
+  - Amount errors: EMPTY, NOT_A_NUMBER, NEGATIVE, ZERO, TOO_MANY_DECIMALS, OVERFLOW
+- Commands run:
+  - `pnpm typecheck` — passed
+  - `pnpm lint` — passed
+  - `pnpm test` — passed (204 tests)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Validates mainnet/testnet addresses correctly
+  - [x] Detects network mismatch with clear error message
+  - [x] Normalizes addresses to canonical form
+  - [x] Amount parsing with decimal handling and rounding
+  - [x] Batch validation with summary statistics
+- Commit: 93dcb36459b9842949157bccabdba614bd863325
 
 ### [ ] T-0303 CSV import + column mapping + validation + optional duplicate merge
 
