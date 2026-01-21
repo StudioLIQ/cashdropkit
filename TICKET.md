@@ -96,7 +96,7 @@ A ticket can be marked DONE only when:
 
 ## 2) Phase 1 — Local DB / Crypto / Wallets
 
-### [ ] T-0101 Dexie schema + migrations
+### [x] T-0101 Dexie schema + migrations — DONE
 
 **Goal:** Persist campaigns + execution state in IndexedDB.
 
@@ -110,6 +110,28 @@ A ticket can be marked DONE only when:
 
 - reload retains all state
 - schema version upgrade path exists
+
+**Completion Details:**
+
+- Changed files: package.json, pnpm-lock.yaml, src/core/db/*
+- Created files:
+  - `src/core/db/types.ts` — Domain types (Wallet, AirdropCampaign, VestingCampaign, etc.)
+  - `src/core/db/db.ts` — Dexie database class with schema v1
+  - `src/core/db/repositories.ts` — CRUD operations for all tables
+  - `src/core/db/migrations.ts` — Migration utilities and version checking
+  - `src/core/db/index.ts` — Public exports
+  - `src/core/db/db.test.ts` — Test suite for persistence verification
+- Commands run:
+  - `pnpm format` — passed
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] All tables defined with proper indexes
+  - [x] Repository CRUD operations implemented
+  - [x] Migration strategy documented
+  - [x] BigInt stored as string for IndexedDB compatibility
+- Commit: 6238a8396343341d0e305a48925a4cf4750cc702
 
 ### [ ] T-0102 BigInt JSON serialization (replacer/reviver)
 
