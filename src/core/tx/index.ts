@@ -5,3 +5,4 @@
  */
 
 export * from './feeEstimator';
+export * from './tokenTxBuilder';
