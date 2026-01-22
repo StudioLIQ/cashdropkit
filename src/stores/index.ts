@@ -13,3 +13,4 @@ export {
 export { useTokenStore, type TokenState } from './tokenStore';
 export { useCsvStore, type CsvState, type CsvWorkflowStep } from './csvStore';
 export { useAirdropStore, type AirdropState } from './airdropStore';
+export { useUtxoStore, type UtxoState } from './utxoStore';
