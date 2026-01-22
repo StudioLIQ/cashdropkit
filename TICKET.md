@@ -742,7 +742,7 @@ A ticket can be marked DONE only when:
   - [x] Insufficient tokens/BCH validation
 - Commit: c309ff6f7f841ce975448d58d71f26fab9b7bb8e
 
-### [ ] T-0502 LocalMnemonicSigner + signing pipeline
+### [x] T-0502 LocalMnemonicSigner + signing pipeline — DONE
 
 **Goal:** Sign locally with mnemonic-derived keys.
 
@@ -755,6 +755,30 @@ A ticket can be marked DONE only when:
 
 - unsigned → signed tx generation works
 - secrets never leave local runtime
+
+**Completion Details:**
+
+- Changed files: 4 created
+- Created files:
+  - `src/core/signer/Signer.ts` — Signer interface, SignedTransaction, SignedInput, SIGHASH constants
+  - `src/core/signer/LocalMnemonicSigner.ts` — Full signing implementation with BIP143 sighash, secp256k1 via libauth
+  - `src/core/signer/index.ts` — Module exports
+  - `src/core/signer/signer.test.ts` — 19 unit tests
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm test` — passed (380 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Unsigned → signed tx generation works (tested with 1, 2 inputs)
+  - [x] Secrets never leave local runtime (all signing done in-memory)
+  - [x] BIP143 sighash correctly computed with SIGHASH_FORKID
+  - [x] Transaction hex correctly encoded
+  - [x] Transaction ID (txid) correctly computed
+  - [x] Token inputs properly handled in sighash (token prefix in UTXO)
+  - [x] Multiple inputs sign with different signatures
+  - [x] Signer properly destroyed and rejects operations after destroy
+- Commit: 7b5b498f0bdadadd5d7d8cec84161a9d8f6ab0b0
 
 ### [ ] T-0503 Executor v1: sequential batch run + txid persistence-before-broadcast
 
