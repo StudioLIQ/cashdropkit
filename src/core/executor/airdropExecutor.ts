@@ -5,6 +5,8 @@
  * - Sequential batch processing
  * - txid persistence BEFORE broadcast (idempotent, resume-safe)
  * - Failure handling and recovery
+ * - Pause/resume/stop controls
+ * - Retry failed batches (same tx or force rebuild)
  * - Progress tracking
  *
  * Critical invariant: Once a batch is signed, its txid is persisted
@@ -86,6 +88,33 @@ export interface ExecutorResult {
   failedBatches: number;
   skippedBatches: number;
   error?: string;
+}
+
+/**
+ * Retry options for failed batches
+ */
+export interface RetryOptions {
+  /**
+   * If true, rebuild the transaction from scratch (new txid).
+   * If false (default), attempt to rebroadcast the same signed tx if available.
+   */
+  forceRebuild?: boolean;
+  /**
+   * Only retry batches that match these IDs. If empty/undefined, retry all failed batches.
+   */
+  batchIds?: string[];
+}
+
+/**
+ * Failed batch info for display
+ */
+export interface FailedBatchInfo {
+  batchId: string;
+  batchIndex: number;
+  recipientCount: number;
+  error: string;
+  txid?: string;
+  canRebroadcast: boolean;
 }
 
 // ============================================================================
@@ -208,6 +237,314 @@ export class AirdropExecutor {
    */
   isAborted(): boolean {
     return this.aborted;
+  }
+
+  /**
+   * Reset abort flag (for resume)
+   */
+  resetAbort(): void {
+    this.aborted = false;
+  }
+
+  /**
+   * Get the current campaign (for state inspection)
+   */
+  getCampaign(): AirdropCampaign {
+    return this.campaign;
+  }
+
+  /**
+   * Get list of failed batches with details
+   */
+  getFailedBatches(): FailedBatchInfo[] {
+    const plan = this.campaign.plan;
+    const execution = this.campaign.execution;
+
+    if (!plan || !execution) {
+      return [];
+    }
+
+    const failedBatches: FailedBatchInfo[] = [];
+
+    for (let i = 0; i < plan.batches.length; i++) {
+      const batch = plan.batches[i];
+
+      // Check if batch failed
+      const failure = execution.failures.batchFailures.find((f) => f.batchId === batch.id);
+      if (!failure) continue;
+
+      failedBatches.push({
+        batchId: batch.id,
+        batchIndex: i,
+        recipientCount: batch.recipients.length,
+        error: failure.error,
+        txid: batch.txid,
+        canRebroadcast: !!batch.txid, // Can rebroadcast if we have a signed tx
+      });
+    }
+
+    return failedBatches;
+  }
+
+  /**
+   * Reset a batch's state for retry
+   */
+  private resetBatchForRetry(batchId: string, forceRebuild: boolean): void {
+    const plan = this.campaign.plan;
+    const execution = this.campaign.execution;
+
+    if (!plan || !execution) return;
+
+    const batch = plan.batches.find((b) => b.id === batchId);
+    if (!batch) return;
+
+    // Remove from failures list
+    execution.failures.batchFailures = execution.failures.batchFailures.filter(
+      (f) => f.batchId !== batchId
+    );
+
+    // Reset recipients in this batch
+    for (const recipientId of batch.recipients) {
+      const recipient = this.campaign.recipients.find((r) => r.id === recipientId);
+      if (recipient) {
+        if (forceRebuild) {
+          // Full reset - need new tx
+          recipient.status = 'PLANNED';
+          recipient.error = undefined;
+          recipient.txid = undefined;
+        } else if (recipient.status === 'FAILED') {
+          // Rebroadcast - keep txid, just retry broadcast
+          recipient.status = 'PLANNED';
+          recipient.error = undefined;
+        }
+      }
+    }
+
+    // Reset batch txid if force rebuild
+    if (forceRebuild) {
+      batch.txid = undefined;
+      // Also remove from confirmations
+      const oldTxid = batch.txid;
+      if (oldTxid && execution.confirmations[oldTxid]) {
+        delete execution.confirmations[oldTxid];
+      }
+    }
+  }
+
+  /**
+   * Retry failed batches
+   *
+   * This method retries only batches that have failed.
+   * By default, it attempts to rebroadcast the same signed transaction.
+   * With forceRebuild=true, it rebuilds the transaction from scratch.
+   */
+  async retryFailedBatches(options: RetryOptions = {}): Promise<ExecutorResult> {
+    const { forceRebuild = false, batchIds } = options;
+
+    const plan = this.campaign.plan;
+    if (!plan) {
+      return {
+        success: false,
+        completedBatches: 0,
+        failedBatches: 0,
+        skippedBatches: 0,
+        error: 'No distribution plan found',
+      };
+    }
+
+    const execution = this.campaign.execution;
+    if (!execution) {
+      return {
+        success: false,
+        completedBatches: 0,
+        failedBatches: 0,
+        skippedBatches: 0,
+        error: 'No execution state found',
+      };
+    }
+
+    // Get failed batches to retry
+    const failedBatches = this.getFailedBatches();
+    const batchesToRetry = batchIds
+      ? failedBatches.filter((f) => batchIds.includes(f.batchId))
+      : failedBatches;
+
+    if (batchesToRetry.length === 0) {
+      return {
+        success: true,
+        completedBatches: 0,
+        failedBatches: 0,
+        skippedBatches: 0,
+        error: 'No failed batches to retry',
+      };
+    }
+
+    await logRepo.log(
+      'info',
+      'executor',
+      `Retrying ${batchesToRetry.length} failed batches (forceRebuild: ${forceRebuild})`,
+      { batchIds: batchesToRetry.map((b) => b.batchId), forceRebuild },
+      this.campaign.id
+    );
+
+    // Reset abort flag
+    this.aborted = false;
+
+    // Reset batches for retry
+    for (const batch of batchesToRetry) {
+      this.resetBatchForRetry(batch.batchId, forceRebuild);
+    }
+
+    // Set state to running
+    execution.state = 'RUNNING';
+    execution.broadcast.lastUpdatedAt = Date.now();
+    await this.persistCampaign();
+
+    // Load fresh UTXOs if force rebuild
+    if (forceRebuild) {
+      try {
+        await this.loadUtxos();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error loading UTXOs';
+        execution.state = 'FAILED';
+        await this.persistCampaign();
+        return {
+          success: false,
+          completedBatches: 0,
+          failedBatches: batchesToRetry.length,
+          skippedBatches: 0,
+          error: message,
+        };
+      }
+    }
+
+    let completedBatches = 0;
+    let failedBatchCount = 0;
+    let skippedBatches = 0;
+
+    // Process only the failed batches
+    for (const batchInfo of batchesToRetry) {
+      if (this.aborted) {
+        execution.state = 'PAUSED';
+        await this.persistCampaign();
+        await logRepo.log('info', 'executor', 'Retry paused by user', {}, this.campaign.id);
+        break;
+      }
+
+      const batch = plan.batches.find((b) => b.id === batchInfo.batchId);
+      if (!batch) {
+        skippedBatches++;
+        continue;
+      }
+
+      this.reportProgress({
+        state: 'RUNNING',
+        currentBatchIndex: batchInfo.batchIndex,
+        totalBatches: batchesToRetry.length,
+        completedBatches,
+        failedBatches: failedBatchCount,
+        currentBatchId: batch.id,
+        message: `Retrying batch ${completedBatches + 1}/${batchesToRetry.length}`,
+      });
+
+      let result: BatchExecutionResult;
+
+      // Try rebroadcast first if not force rebuild and we have a txid
+      if (!forceRebuild && batch.txid) {
+        result = await this.rebroadcastBatch(batch);
+      } else {
+        result = await this.executeBatch(batch);
+      }
+
+      if (result.success) {
+        completedBatches++;
+        await logRepo.log(
+          'info',
+          'executor',
+          `Batch ${batch.id} retry completed with txid ${result.txid}`,
+          { batchId: batch.id, txid: result.txid },
+          this.campaign.id,
+          batch.id
+        );
+      } else {
+        failedBatchCount++;
+        execution.failures.batchFailures.push({
+          batchId: batch.id,
+          error: result.error || 'Unknown error',
+        });
+        await logRepo.log(
+          'error',
+          'executor',
+          `Batch ${batch.id} retry failed: ${result.error}`,
+          { batchId: batch.id, error: result.error },
+          this.campaign.id,
+          batch.id
+        );
+
+        // Stop on first failure (fail-closed)
+        execution.state = 'FAILED';
+        await this.persistCampaign();
+        return {
+          success: false,
+          completedBatches,
+          failedBatches: failedBatchCount,
+          skippedBatches,
+          error: result.error,
+        };
+      }
+    }
+
+    // Update final state
+    if (!this.aborted) {
+      // Check if all original batches are now complete
+      const allCompleted = plan.batches.every((b) => b.txid);
+      execution.state = allCompleted ? 'COMPLETED' : 'FAILED';
+    }
+
+    execution.broadcast.lastUpdatedAt = Date.now();
+    await this.persistCampaign();
+
+    this.reportProgress({
+      state: execution.state,
+      currentBatchIndex: plan.batches.length,
+      totalBatches: batchesToRetry.length,
+      completedBatches,
+      failedBatches: failedBatchCount,
+      message: execution.state === 'COMPLETED' ? 'Retry completed' : 'Retry paused',
+    });
+
+    return {
+      success: failedBatchCount === 0,
+      completedBatches,
+      failedBatches: failedBatchCount,
+      skippedBatches,
+    };
+  }
+
+  /**
+   * Rebroadcast an already signed batch
+   *
+   * Note: For MVP, rebroadcast is not fully implemented because we would need
+   * to store the raw tx hex after signing. Currently this returns an error
+   * and suggests using force rebuild instead.
+   */
+  private async rebroadcastBatch(batch: BatchPlan): Promise<BatchExecutionResult> {
+    const result: BatchExecutionResult = {
+      success: false,
+      batchId: batch.id,
+      broadcastAttempted: false,
+    };
+
+    if (!batch.txid) {
+      result.error = 'No txid available for rebroadcast';
+      return result;
+    }
+
+    // For MVP, if we don't have raw tx stored, we need to rebuild
+    // This is a limitation - full rebroadcast would need stored tx hex
+    // Future improvement: store raw tx hex after signing for rebroadcast capability
+    result.error = 'Rebroadcast not available - stored tx hex not found. Use force rebuild.';
+    return result;
   }
 
   /**
@@ -336,7 +673,7 @@ export class AirdropExecutor {
       }
 
       // Execute batch
-      const result = await this.executeBatch(batch, i);
+      const result = await this.executeBatch(batch);
 
       if (result.success) {
         completedBatches++;
@@ -418,7 +755,7 @@ export class AirdropExecutor {
   /**
    * Execute a single batch
    */
-  private async executeBatch(batch: BatchPlan, _batchIndex: number): Promise<BatchExecutionResult> {
+  private async executeBatch(batch: BatchPlan): Promise<BatchExecutionResult> {
     const result: BatchExecutionResult = {
       success: false,
       batchId: batch.id,

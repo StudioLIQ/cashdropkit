@@ -1,14 +1,168 @@
 'use client';
 
-import { useAirdropStore } from '@/stores';
+import { useCallback, useEffect, useState } from 'react';
 
+import { useAirdropStore, useWalletStore } from '@/stores';
+
+import type { AddressDerivation } from '@/core/signer';
+import { createLocalMnemonicSigner } from '@/core/signer';
+import { unlockWallet } from '@/core/wallet';
+
+/**
+ * Execute Step Component
+ *
+ * Provides:
+ * - Start/Pause/Resume/Stop controls
+ * - Batch list with status
+ * - Failure list with raw error messages
+ * - Retry with force rebuild option
+ */
 export function ExecuteStep() {
-  const { activeCampaign } = useAirdropStore();
+  const { activeCampaign, isExecuting, executionProgress, failedBatches, error } =
+    useAirdropStore();
+  const {
+    startExecution,
+    pauseExecution,
+    resumeExecution,
+    retryFailedBatches,
+    refreshFailedBatches,
+    clearError,
+  } = useAirdropStore();
+  const { wallets, activeWalletId } = useWalletStore();
+
+  // Local UI state
+  const [passphrase, setPassphrase] = useState('');
+  const [showPassphraseModal, setShowPassphraseModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'start' | 'resume' | 'retry' | null>(null);
+  const [forceRebuild, setForceRebuild] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Get active wallet
+  const activeWallet = wallets.find((w) => w.id === activeWalletId);
+
+  const execution = activeCampaign?.execution;
+  const plan = activeCampaign?.plan;
+  const network = activeCampaign?.network ?? 'testnet';
+
+  // Calculate batch statuses
+  const completedBatches = plan?.batches.filter((b) => b.txid).length ?? 0;
+  const totalBatches = plan?.batches.length ?? 0;
+
+  // Determine what actions are available
+  const canStart = !isExecuting && plan && (!execution || execution.state === 'READY');
+  const canResume =
+    !isExecuting && execution && (execution.state === 'PAUSED' || execution.state === 'FAILED');
+  const canPause = isExecuting;
+  const canRetry = !isExecuting && failedBatches.length > 0;
+
+  // Refresh failed batches when campaign execution state changes
+  useEffect(() => {
+    refreshFailedBatches();
+  }, [execution?.state, refreshFailedBatches]);
+
+  // Execute with signer
+  const executeWithSigner = useCallback(async () => {
+    if (!activeWallet || !pendingAction) return;
+
+    setLocalError(null);
+    setShowPassphraseModal(false);
+
+    try {
+      // Unlock wallet to get mnemonic
+      const unlocked = await unlockWallet(activeWallet, passphrase);
+      if (!unlocked) {
+        setLocalError('Failed to unlock wallet. Check your passphrase.');
+        return;
+      }
+
+      // Create signer
+      const signer = createLocalMnemonicSigner(unlocked.mnemonic, network);
+
+      // Get derived addresses for signing
+      // Default derivation uses account 0, addresses 0 through N
+      const addresses = activeWallet.addresses || [];
+      const addressDerivations: AddressDerivation[] = addresses.map((addr, index) => ({
+        address: addr,
+        accountIndex: 0, // Default account
+        addressIndex: index, // Sequential address index
+      }));
+
+      const config = {
+        signer,
+        sourceAddress: addresses[0] || '',
+        addressDerivations,
+        batchDelayMs: 1000, // 1 second between batches
+      };
+
+      let result;
+      switch (pendingAction) {
+        case 'start':
+          result = await startExecution(config);
+          break;
+        case 'resume':
+          result = await resumeExecution(config);
+          break;
+        case 'retry':
+          result = await retryFailedBatches(config, { forceRebuild });
+          break;
+      }
+
+      // Destroy signer after use
+      signer.destroy();
+
+      if (result && !result.success) {
+        setLocalError(result.error || 'Execution failed');
+      }
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Failed to execute');
+    } finally {
+      setPassphrase('');
+      setPendingAction(null);
+    }
+  }, [
+    activeWallet,
+    pendingAction,
+    passphrase,
+    network,
+    forceRebuild,
+    startExecution,
+    resumeExecution,
+    retryFailedBatches,
+  ]);
+
+  // Handle action with passphrase
+  const handleActionWithPassphrase = (action: 'start' | 'resume' | 'retry') => {
+    if (!activeWallet) {
+      setLocalError('No active wallet selected');
+      return;
+    }
+
+    if (activeWallet.type === 'watch-only') {
+      setLocalError('Cannot sign transactions with a watch-only wallet');
+      return;
+    }
+
+    setPendingAction(action);
+    setShowPassphraseModal(true);
+  };
 
   if (!activeCampaign) return null;
 
-  const execution = activeCampaign.execution;
-  const plan = activeCampaign.plan;
+  // Get status badge color
+  const getStatusColor = (state: string | undefined) => {
+    switch (state) {
+      case 'RUNNING':
+        return 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300';
+      case 'PAUSED':
+        return 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300';
+      case 'COMPLETED':
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300';
+      case 'FAILED':
+        return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -17,9 +171,49 @@ export function ExecuteStep() {
           Execute Distribution
         </h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Run the airdrop with pause/resume support.
+          Run the airdrop with pause/resume support and retry failed batches.
         </p>
       </div>
+
+      {/* Error display */}
+      {(error || localError) && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+          <div className="flex items-start gap-3">
+            <svg
+              className="h-5 w-5 flex-shrink-0 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm text-red-700 dark:text-red-300">{error || localError}</p>
+            </div>
+            <button
+              onClick={() => {
+                clearError();
+                setLocalError(null);
+              }}
+              className="text-red-500 hover:text-red-600"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Execution status */}
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -28,29 +222,17 @@ export function ExecuteStep() {
             <div className="text-sm text-zinc-500 dark:text-zinc-400">Status</div>
             <div className="mt-1 flex items-center gap-2">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  execution?.state === 'RUNNING'
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
-                    : execution?.state === 'PAUSED'
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                      : execution?.state === 'COMPLETED'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
-                        : execution?.state === 'FAILED'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                          : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-                }`}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(execution?.state)}`}
               >
                 {execution?.state || 'READY'}
               </span>
-              {execution?.state === 'RUNNING' && (
-                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-              )}
+              {isExecuting && <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />}
             </div>
           </div>
           <div className="text-right">
             <div className="text-sm text-zinc-500 dark:text-zinc-400">Progress</div>
             <div className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              {execution?.currentBatchIndex || 0} / {plan?.batches.length || 0}
+              {completedBatches} / {totalBatches}
             </div>
           </div>
         </div>
@@ -67,47 +249,27 @@ export function ExecuteStep() {
                     : 'bg-emerald-500'
               }`}
               style={{
-                width: `${plan?.batches.length ? ((execution?.currentBatchIndex || 0) / plan.batches.length) * 100 : 0}%`,
+                width: `${totalBatches ? (completedBatches / totalBatches) * 100 : 0}%`,
               }}
             />
           </div>
         </div>
+
+        {/* Progress message */}
+        {executionProgress?.message && (
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            {executionProgress.message}
+          </p>
+        )}
       </div>
 
-      {/* Placeholder for executor controls */}
-      <div className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-700 dark:bg-zinc-800/50">
-        <svg
-          className="mx-auto h-12 w-12 text-zinc-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <h3 className="mt-4 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          Executor Coming Soon
-        </h3>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          The execution engine will be implemented in T-0503 and T-0504.
-          <br />
-          Features: Sign, broadcast, pause/resume, retry failed batches.
-        </p>
-        <div className="mt-4 flex justify-center gap-2">
+      {/* Control buttons */}
+      <div className="flex flex-wrap gap-3">
+        {canStart && (
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white opacity-50"
+            onClick={() => handleActionWithPassphrase('start')}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -117,12 +279,33 @@ export function ExecuteStep() {
                 d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
               />
             </svg>
-            Start
+            Start Execution
           </button>
+        )}
+
+        {canResume && (
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            onClick={() => handleActionWithPassphrase('resume')}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+              />
+            </svg>
+            Resume Execution
+          </button>
+        )}
+
+        {canPause && (
+          <button
+            type="button"
+            onClick={pauseExecution}
+            className="inline-flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-300"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -134,23 +317,207 @@ export function ExecuteStep() {
             </svg>
             Pause
           </button>
+        )}
+      </div>
+
+      {/* Batch status list */}
+      <div>
+        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Batch Status</h3>
+        <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+          {plan?.batches && plan.batches.length > 0 ? (
+            <div className="max-h-64 overflow-y-auto">
+              <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      #
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Recipients
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Status
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      TXID
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-900">
+                  {plan.batches.map((batch, index) => {
+                    const isFailed = failedBatches.some((f) => f.batchId === batch.id);
+                    const isCompleted = !!batch.txid && !isFailed;
+                    const isCurrentBatch = execution?.currentBatchIndex === index && isExecuting;
+
+                    return (
+                      <tr
+                        key={batch.id}
+                        className={isCurrentBatch ? 'bg-amber-50 dark:bg-amber-900/20' : ''}
+                      >
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+                          {index + 1}
+                          {isCurrentBatch && (
+                            <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400">
+                          {batch.recipients.length}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              isCompleted
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
+                                : isFailed
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                                  : isCurrentBatch
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
+                                    : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                            }`}
+                          >
+                            {isCompleted
+                              ? 'Completed'
+                              : isFailed
+                                ? 'Failed'
+                                : isCurrentBatch
+                                  ? 'Processing'
+                                  : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs font-mono text-zinc-500 dark:text-zinc-400">
+                          {batch.txid ? (
+                            <span title={batch.txid}>{batch.txid.slice(0, 12)}...</span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              No plan generated yet
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Batch list placeholder */}
-      <div>
-        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Batch Status</h3>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Detailed batch view will show inputs, outputs, and transaction details.
-        </p>
-        <div className="mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <div className="p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-            {plan?.batches.length
-              ? `${plan.batches.length} batches will be displayed here`
-              : 'No plan generated yet'}
+      {/* Failed batches section */}
+      {failedBatches.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-red-700 dark:text-red-400">
+              Failed Batches ({failedBatches.length})
+            </h3>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={forceRebuild}
+                  onChange={(e) => setForceRebuild(e.target.checked)}
+                  className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                Force rebuild (new TXID)
+              </label>
+              {canRetry && (
+                <button
+                  type="button"
+                  onClick={() => handleActionWithPassphrase('retry')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Retry Failed
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {failedBatches.map((failure) => (
+              <div
+                key={failure.batchId}
+                className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-red-800 dark:text-red-200">
+                      Batch #{failure.batchIndex + 1}
+                    </span>
+                    <span className="ml-2 text-xs text-red-600 dark:text-red-400">
+                      ({failure.recipientCount} recipients)
+                    </span>
+                  </div>
+                  {failure.txid && (
+                    <span className="text-xs font-mono text-red-500">
+                      txid: {failure.txid.slice(0, 12)}...
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-red-700 dark:text-red-300 font-mono break-all">
+                  {failure.error}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Passphrase modal */}
+      {showPassphraseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              Enter Passphrase
+            </h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Enter your wallet passphrase to sign transactions.
+            </p>
+            <input
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              placeholder="Passphrase"
+              className="mt-4 w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && passphrase) {
+                  executeWithSigner();
+                }
+              }}
+            />
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPassphraseModal(false);
+                  setPassphrase('');
+                  setPendingAction(null);
+                }}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeWithSigner}
+                disabled={!passphrase}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Unlock &amp; Execute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

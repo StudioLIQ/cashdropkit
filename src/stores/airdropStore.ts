@@ -2,7 +2,7 @@
  * Airdrop Store
  *
  * Zustand store for airdrop campaign state management.
- * Handles campaign list, active campaign, wizard state, and UI state.
+ * Handles campaign list, active campaign, wizard state, execution state, and UI state.
  */
 import { create } from 'zustand';
 
@@ -14,6 +14,15 @@ import {
   getCurrentWizardStep,
 } from '@/core/airdrop';
 import type { AirdropCampaign, Network, RecipientRow, TokenRef } from '@/core/db/types';
+import {
+  AirdropExecutor,
+  type ExecutionProgress,
+  type ExecutorConfig,
+  type ExecutorResult,
+  type FailedBatchInfo,
+  type RetryOptions,
+  createAirdropExecutor,
+} from '@/core/executor';
 import {
   type PlannerResult,
   type PlannerWarning,
@@ -45,6 +54,12 @@ export interface AirdropState {
   plannerWarnings: PlannerWarning[];
   quickEstimate: QuickEstimate | null;
 
+  // Execution state
+  isExecuting: boolean;
+  executorRef: AirdropExecutor | null;
+  executionProgress: ExecutionProgress | null;
+  failedBatches: FailedBatchInfo[];
+
   // Error state
   error: string | null;
 
@@ -75,6 +90,17 @@ export interface AirdropState {
   updateQuickEstimate: () => void;
   clearPlan: () => void;
 
+  // Actions - Execution
+  startExecution: (config: Omit<ExecutorConfig, 'adapter'>) => Promise<ExecutorResult | null>;
+  pauseExecution: () => void;
+  resumeExecution: (config: Omit<ExecutorConfig, 'adapter'>) => Promise<ExecutorResult | null>;
+  retryFailedBatches: (
+    config: Omit<ExecutorConfig, 'adapter'>,
+    options?: RetryOptions
+  ) => Promise<ExecutorResult | null>;
+  refreshFailedBatches: () => void;
+  setExecutorConfig: (config: ExecutorConfig) => void;
+
   // Actions - UI
   openCreateModal: () => void;
   closeCreateModal: () => void;
@@ -91,6 +117,17 @@ const STEP_ORDER: AirdropWizardStep[] = [
   'report',
 ];
 
+// Store the adapter externally (set via connectionService)
+let currentAdapter: ExecutorConfig['adapter'] | null = null;
+
+export function setGlobalAdapter(adapter: ExecutorConfig['adapter'] | null): void {
+  currentAdapter = adapter;
+}
+
+export function getGlobalAdapter(): ExecutorConfig['adapter'] | null {
+  return currentAdapter;
+}
+
 export const useAirdropStore = create<AirdropState>((set, get) => ({
   // Initial state
   campaigns: [],
@@ -105,6 +142,10 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
   isPlanning: false,
   plannerWarnings: [],
   quickEstimate: null,
+  isExecuting: false,
+  executorRef: null,
+  executionProgress: null,
+  failedBatches: [],
   error: null,
 
   // Load campaigns list
@@ -390,6 +431,212 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
       plannerWarnings: [],
       quickEstimate: null,
     });
+  },
+
+  // Execution actions
+  startExecution: async (config) => {
+    const campaign = get().activeCampaign;
+    if (!campaign || !campaign.plan) {
+      set({ error: 'No campaign or plan available' });
+      return null;
+    }
+
+    const adapter = currentAdapter;
+    if (!adapter) {
+      set({ error: 'No chain adapter available. Please check connection.' });
+      return null;
+    }
+
+    set({ isExecuting: true, error: null, executionProgress: null });
+
+    try {
+      const executor = createAirdropExecutor({ ...config, adapter }, campaign);
+
+      // Set up progress callback
+      executor.onProgress((progress) => {
+        set({ executionProgress: progress });
+
+        // Refresh campaign from executor to get updated state
+        const updatedCampaign = executor.getCampaign();
+        set({ activeCampaign: { ...updatedCampaign } });
+      });
+
+      set({ executorRef: executor });
+
+      const result = await executor.execute();
+
+      // Refresh campaign and failed batches after execution
+      const updatedCampaign = executor.getCampaign();
+      const failedBatches = executor.getFailedBatches();
+
+      set({
+        isExecuting: false,
+        executorRef: null,
+        activeCampaign: { ...updatedCampaign },
+        failedBatches,
+      });
+
+      return result;
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Execution failed',
+        isExecuting: false,
+        executorRef: null,
+      });
+      return null;
+    }
+  },
+
+  pauseExecution: () => {
+    const executor = get().executorRef;
+    if (executor) {
+      executor.abort();
+    }
+  },
+
+  resumeExecution: async (config) => {
+    const campaign = get().activeCampaign;
+    if (!campaign || !campaign.plan) {
+      set({ error: 'No campaign or plan available' });
+      return null;
+    }
+
+    const adapter = currentAdapter;
+    if (!adapter) {
+      set({ error: 'No chain adapter available. Please check connection.' });
+      return null;
+    }
+
+    // Check if execution state exists and can be resumed
+    if (
+      !campaign.execution ||
+      (campaign.execution.state !== 'PAUSED' && campaign.execution.state !== 'FAILED')
+    ) {
+      set({ error: 'No paused or failed execution to resume' });
+      return null;
+    }
+
+    set({ isExecuting: true, error: null });
+
+    try {
+      const executor = createAirdropExecutor({ ...config, adapter }, campaign);
+
+      // Set up progress callback
+      executor.onProgress((progress) => {
+        set({ executionProgress: progress });
+
+        const updatedCampaign = executor.getCampaign();
+        set({ activeCampaign: { ...updatedCampaign } });
+      });
+
+      set({ executorRef: executor });
+
+      const result = await executor.execute();
+
+      // Refresh campaign and failed batches after execution
+      const updatedCampaign = executor.getCampaign();
+      const failedBatches = executor.getFailedBatches();
+
+      set({
+        isExecuting: false,
+        executorRef: null,
+        activeCampaign: { ...updatedCampaign },
+        failedBatches,
+      });
+
+      return result;
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Resume failed',
+        isExecuting: false,
+        executorRef: null,
+      });
+      return null;
+    }
+  },
+
+  retryFailedBatches: async (config, options = {}) => {
+    const campaign = get().activeCampaign;
+    if (!campaign || !campaign.plan) {
+      set({ error: 'No campaign or plan available' });
+      return null;
+    }
+
+    const adapter = currentAdapter;
+    if (!adapter) {
+      set({ error: 'No chain adapter available. Please check connection.' });
+      return null;
+    }
+
+    set({ isExecuting: true, error: null });
+
+    try {
+      const executor = createAirdropExecutor({ ...config, adapter }, campaign);
+
+      // Set up progress callback
+      executor.onProgress((progress) => {
+        set({ executionProgress: progress });
+
+        const updatedCampaign = executor.getCampaign();
+        set({ activeCampaign: { ...updatedCampaign } });
+      });
+
+      set({ executorRef: executor });
+
+      const result = await executor.retryFailedBatches(options);
+
+      // Refresh campaign and failed batches after retry
+      const updatedCampaign = executor.getCampaign();
+      const failedBatches = executor.getFailedBatches();
+
+      set({
+        isExecuting: false,
+        executorRef: null,
+        activeCampaign: { ...updatedCampaign },
+        failedBatches,
+      });
+
+      return result;
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Retry failed',
+        isExecuting: false,
+        executorRef: null,
+      });
+      return null;
+    }
+  },
+
+  refreshFailedBatches: () => {
+    const campaign = get().activeCampaign;
+    if (!campaign || !campaign.plan || !campaign.execution) {
+      set({ failedBatches: [] });
+      return;
+    }
+
+    // Calculate failed batches from campaign state
+    const failedBatches: FailedBatchInfo[] = [];
+    for (let i = 0; i < campaign.plan.batches.length; i++) {
+      const batch = campaign.plan.batches[i];
+      const failure = campaign.execution.failures.batchFailures.find((f) => f.batchId === batch.id);
+      if (!failure) continue;
+
+      failedBatches.push({
+        batchId: batch.id,
+        batchIndex: i,
+        recipientCount: batch.recipients.length,
+        error: failure.error,
+        txid: batch.txid,
+        canRebroadcast: !!batch.txid,
+      });
+    }
+
+    set({ failedBatches });
+  },
+
+  setExecutorConfig: () => {
+    // This is a placeholder for setting config externally
+    // The actual adapter is set via setGlobalAdapter
   },
 
   // UI controls

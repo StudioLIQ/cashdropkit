@@ -2,8 +2,7 @@
 
 import { ReactNode, useCallback, useEffect } from 'react';
 
-import { useConnectionStore } from '@/stores/connectionStore';
-import { useWalletStore } from '@/stores/walletStore';
+import { setGlobalAdapter, useConnectionStore, useWalletStore } from '@/stores';
 
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
 import type { Network } from '@/core/db/types';
@@ -32,18 +31,32 @@ export function AppShell({ children }: AppShellProps) {
     const unsubscribe = service.addListener((result) => {
       recordHealthCheck(result);
       setChecking(false);
+
+      // Update global adapter when connection is healthy
+      if (result.healthy) {
+        setGlobalAdapter(service.getAdapter());
+      }
     });
 
     // Start the connection
     setChecking(true);
-    service.start(network).catch((err) => {
-      console.error('Failed to start connection service:', err);
-      setChecking(false);
-    });
+    service
+      .start(network)
+      .then((result) => {
+        // Set global adapter after successful connection
+        if (result.healthy) {
+          setGlobalAdapter(service.getAdapter());
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to start connection service:', err);
+        setChecking(false);
+      });
 
     // Cleanup on unmount
     return () => {
       unsubscribe();
+      setGlobalAdapter(null);
       service.stop();
     };
     // Only run on mount
@@ -65,7 +78,11 @@ export function AppShell({ children }: AppShellProps) {
 
       const service = getConnectionService();
       try {
-        await service.switchNetwork(newNetwork);
+        const result = await service.switchNetwork(newNetwork);
+        // Update global adapter after network switch
+        if (result.healthy) {
+          setGlobalAdapter(service.getAdapter());
+        }
       } catch (err) {
         console.error('Failed to switch network:', err);
       }

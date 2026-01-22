@@ -13,4 +13,6 @@ export {
   type ExecutionProgress,
   type ExecutionProgressCallback,
   type ExecutorResult,
+  type RetryOptions,
+  type FailedBatchInfo,
 } from './airdropExecutor';
