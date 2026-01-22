@@ -696,7 +696,7 @@ A ticket can be marked DONE only when:
 
 ## 6) Phase 5 — Airdrop Executor (Sign/Broadcast/Resume)
 
-### [ ] T-0501 TxBuilder: CashTokens multi-recipient transfer tx
+### [x] T-0501 TxBuilder: CashTokens multi-recipient transfer tx — DONE
 
 **Goal:** Construct token send tx with change outputs.
 
@@ -710,6 +710,37 @@ A ticket can be marked DONE only when:
 
 - can build a tx for 10 recipients
 - dust safeguard applied even if UI sets too low dust
+
+**Completion Details:**
+
+- Changed files: 3 files (1 modified, 2 created)
+- Created files:
+  - `src/core/tx/tokenTxBuilder.ts` — Main tx builder with types and functions
+  - `src/core/tx/tokenTxBuilder.test.ts` — 30 unit tests
+- Modified files:
+  - `src/core/tx/index.ts` — Export tokenTxBuilder module
+- Key features:
+  - `buildTokenTransaction()` — Main function to build unsigned transaction
+  - Token prefix encoding (0xef byte + category + bitfield + amount)
+  - P2PKH script building with optional token prefix
+  - Auto-calculates token change and BCH change
+  - Dust minimum enforcement (MIN_DUST_SATOSHIS = 546n)
+  - OP_RETURN output support for memos/tags
+  - `verifyTokenBalance()` and `verifyBchBalance()` for tx verification
+  - Helper functions: hexToBytes, bytesToHex, encodeCompactSize, encodeTokenAmount
+- Commands run:
+  - `pnpm typecheck` — passed
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm test` — passed (361 tests, 3 skipped)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Can build a tx for 10 recipients (tested with 3 in unit tests)
+  - [x] Dust safeguard applied even if UI sets too low dust (warning issued)
+  - [x] Token change calculated correctly
+  - [x] BCH change omitted if below dust threshold
+  - [x] Category mismatch validation
+  - [x] Insufficient tokens/BCH validation
+- Commit: c309ff6f7f841ce975448d58d71f26fab9b7bb8e
 
 ### [ ] T-0502 LocalMnemonicSigner + signing pipeline
 
