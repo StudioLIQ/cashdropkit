@@ -598,7 +598,7 @@ A ticket can be marked DONE only when:
   - [x] Active campaign state updates on name/token changes
 - Commit: 8092294d84e3d439d08969a086f58fabf0dcca17
 
-### [ ] T-0402 Planner (batching + fee/dust estimation)
+### [x] T-0402 Planner (batching + fee/dust estimation) — DONE
 
 **Goal:** Simulation shows batch count and required BCH.
 
@@ -611,6 +611,36 @@ A ticket can be marked DONE only when:
 
 - changing maxOutputsPerTx updates batch count instantly
 - requiredBchSat includes dust + fee
+
+**Completion Details:**
+
+- Changed files: 10 files (4 modified, 6 created)
+- Created files:
+  - `src/core/tx/feeEstimator.ts` — Transaction size estimation and fee calculation
+  - `src/core/tx/feeEstimator.test.ts` — 29 unit tests
+  - `src/core/tx/index.ts` — Module exports
+  - `src/core/planner/airdropPlanner.ts` — Batching, plan generation, quick estimates
+  - `src/core/planner/airdropPlanner.test.ts` — 35 unit tests
+  - `src/core/planner/index.ts` — Module exports
+- Modified files:
+  - `src/core/airdrop/airdropService.ts` — Added updatePlan/clearPlan methods
+  - `src/stores/airdropStore.ts` — Added planning state and actions
+  - `src/ui/components/airdrop/wizard/SimulationStep.tsx` — Full planner UI integration
+  - `vitest.config.mts` — Added path alias for @/ imports
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 4 pre-existing warnings)
+  - `pnpm format` — passed
+  - `pnpm test` — passed (303 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] maxOutputsPerTx slider updates batch count instantly via quickEstimate
+  - [x] requiredBchSat includes both dust and fee
+  - [x] Generate Plan button creates full DistributionPlan with batches
+  - [x] Batch breakdown table shows recipients, size, and fee per batch
+  - [x] Plan invalidation when settings change
+  - [x] Pre-flight checks show recipients/wallet/token status
+- Commit: 254c2512b3c5460d7a9969817915ae9a95ff138c
 
 ### [ ] T-0403 UTXO selection (auto/manual) + explicit shortage errors
 
