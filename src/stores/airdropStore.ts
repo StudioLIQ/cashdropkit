@@ -14,6 +14,13 @@ import {
   getCurrentWizardStep,
 } from '@/core/airdrop';
 import type { AirdropCampaign, Network, RecipientRow, TokenRef } from '@/core/db/types';
+import {
+  type PlannerResult,
+  type PlannerWarning,
+  type QuickEstimate,
+  generatePlanFromCampaign,
+  quickEstimate,
+} from '@/core/planner';
 
 export interface AirdropState {
   // Campaign list data
@@ -32,6 +39,11 @@ export interface AirdropState {
   isCreating: boolean;
   isDeleting: boolean;
   isSaving: boolean;
+
+  // Planning state
+  isPlanning: boolean;
+  plannerWarnings: PlannerWarning[];
+  quickEstimate: QuickEstimate | null;
 
   // Error state
   error: string | null;
@@ -57,6 +69,11 @@ export interface AirdropState {
   setCurrentStep: (step: AirdropWizardStep) => void;
   goToNextStep: () => void;
   goToPreviousStep: () => void;
+
+  // Actions - Planning
+  generatePlan: () => Promise<PlannerResult | null>;
+  updateQuickEstimate: () => void;
+  clearPlan: () => void;
 
   // Actions - UI
   openCreateModal: () => void;
@@ -85,6 +102,9 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
   isCreating: false,
   isDeleting: false,
   isSaving: false,
+  isPlanning: false,
+  plannerWarnings: [],
+  quickEstimate: null,
   error: null,
 
   // Load campaigns list
@@ -303,6 +323,73 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
     if (currentIndex > 0) {
       set({ currentStep: STEP_ORDER[currentIndex - 1] });
     }
+  },
+
+  // Planning actions
+  generatePlan: async () => {
+    const campaign = get().activeCampaign;
+    if (!campaign) return null;
+
+    set({ isPlanning: true, error: null, plannerWarnings: [] });
+    try {
+      const result = generatePlanFromCampaign(campaign);
+
+      if (result.success && result.plan) {
+        // Update campaign with plan
+        const updatedCampaign = {
+          ...campaign,
+          plan: result.plan,
+          updatedAt: Date.now(),
+        };
+        set({
+          activeCampaign: updatedCampaign,
+          plannerWarnings: result.warnings,
+          isPlanning: false,
+        });
+
+        // Persist to DB
+        await airdropService.updatePlan(campaign.id, result.plan);
+
+        return result;
+      } else {
+        // Planning failed
+        set({
+          error: result.errors.map((e) => e.message).join('; '),
+          plannerWarnings: result.warnings,
+          isPlanning: false,
+        });
+        return result;
+      }
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to generate plan',
+        isPlanning: false,
+      });
+      return null;
+    }
+  },
+
+  updateQuickEstimate: () => {
+    const campaign = get().activeCampaign;
+    if (!campaign) {
+      set({ quickEstimate: null });
+      return;
+    }
+
+    const validRecipients = campaign.recipients.filter((r) => r.valid);
+    const estimate = quickEstimate(validRecipients.length, campaign.settings);
+    set({ quickEstimate: estimate });
+  },
+
+  clearPlan: () => {
+    const campaign = get().activeCampaign;
+    if (!campaign) return;
+
+    set({
+      activeCampaign: { ...campaign, plan: undefined, updatedAt: Date.now() },
+      plannerWarnings: [],
+      quickEstimate: null,
+    });
   },
 
   // UI controls

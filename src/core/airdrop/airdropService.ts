@@ -326,6 +326,20 @@ export const airdropService = {
   },
 
   /**
+   * Update campaign plan
+   */
+  async updatePlan(id: string, plan: AirdropCampaign['plan']): Promise<void> {
+    await airdropRepo.patch(id, { plan });
+  },
+
+  /**
+   * Clear campaign plan
+   */
+  async clearPlan(id: string): Promise<void> {
+    await airdropRepo.patch(id, { plan: undefined });
+  },
+
+  /**
    * Check if campaign can be deleted (not in execution)
    */
   canDelete(campaign: AirdropCampaign): boolean {
