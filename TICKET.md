@@ -780,7 +780,7 @@ A ticket can be marked DONE only when:
   - [x] Signer properly destroyed and rejects operations after destroy
 - Commit: 7b5b498f0bdadadd5d7d8cec84161a9d8f6ab0b0
 
-### [ ] T-0503 Executor v1: sequential batch run + txid persistence-before-broadcast
+### [x] T-0503 Executor v1: sequential batch run + txid persistence-before-broadcast — DONE
 
 **Goal:** Make execution idempotent and resume-safe.
 
@@ -793,6 +793,29 @@ A ticket can be marked DONE only when:
 
 - runs 3 batches sequentially
 - reload → resume continues without double-paying
+
+**Completion Details:**
+
+- Changed files: 3 created
+- Created files:
+  - `src/core/executor/airdropExecutor.ts` — AirdropExecutor class with sequential batch processing
+  - `src/core/executor/index.ts` — Module exports
+  - `src/core/executor/airdropExecutor.test.ts` — 12 unit tests
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 3 pre-existing warnings)
+  - `pnpm test` — passed (392 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Runs multiple batches sequentially (tested with 3 batches)
+  - [x] txid computed after signing, persisted BEFORE broadcast
+  - [x] Batches with existing txid are skipped (resume support)
+  - [x] Fail-closed: execution stops on first batch failure
+  - [x] Progress callback reports state changes
+  - [x] Execution state tracks READY/RUNNING/PAUSED/COMPLETED/FAILED
+  - [x] Confirmation status tracked per txid
+  - [x] Abort functionality pauses execution
+- Commit: 28fd9d7e5b153e1aadd322547edc9ab626e40143
 
 ### [ ] T-0504 Pause/Resume/Stop + Retry failed
 
