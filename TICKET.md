@@ -642,9 +642,9 @@ A ticket can be marked DONE only when:
   - [x] Pre-flight checks show recipients/wallet/token status
 - Commit: 254c2512b3c5460d7a9969817915ae9a95ff138c
 
-### [ ] T-0403 UTXO selection (auto/manual) + explicit shortage errors
+### [x] T-0403 UTXO selection (auto/manual) + explicit shortage errors — DONE
 
-**Goal:** Prevent “start execution then fail immediately”.
+**Goal:** Prevent "start execution then fail immediately".
 
 **Deliverables:**
 
@@ -656,6 +656,41 @@ A ticket can be marked DONE only when:
 
 - BCH shortage and token shortage are distinct and precise
 - manual selection warns about execution risk
+
+**Completion Details:**
+
+- Changed files: 7 files (2 modified, 5 created)
+- Created files:
+  - `src/core/utxo/types.ts` — UTXO types (UtxoSummary, SelectedUtxos, DistributionRequirements, UtxoValidationResult, error factories)
+  - `src/core/utxo/utxoSelector.ts` — Auto selection (largest-first), manual validation, filtering, formatting
+  - `src/core/utxo/utxoSelector.test.ts` — 28 unit tests
+  - `src/core/utxo/index.ts` — Module exports
+  - `src/stores/utxoStore.ts` — Zustand store for UTXO selection state
+- Modified files:
+  - `src/stores/index.ts` — Export useUtxoStore
+  - `src/ui/components/airdrop/wizard/FundingStep.tsx` — Full UTXO selection UI with tables
+- Key features:
+  - Auto selection: sorts by amount (largest first), respects input limits
+  - Manual selection: validates against requirements with precise errors
+  - NFT exclusion by default (safety)
+  - Dust UTXO filtering (< 546 sats)
+  - Error types: INSUFFICIENT_TOKENS, INSUFFICIENT_BCH, NO_TOKEN_UTXOS, NO_BCH_UTXOS, TOO_FRAGMENTED, INPUT_LIMIT_EXCEEDED
+  - Warnings: UNCONFIRMED_INPUTS, MANY_INPUTS
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 7 warnings pre-existing)
+  - `pnpm test` — passed (331 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] BCH shortage and token shortage are distinct and precise (separate error types with Required/Available/Missing)
+  - [x] Manual selection warns about execution risk (unconfirmed UTXOs, many inputs)
+  - [x] Auto toggle switches between auto/manual modes
+  - [x] Token UTXO table with selection checkboxes
+  - [x] BCH UTXO table with selection checkboxes
+  - [x] Select all / clear buttons for manual mode
+  - [x] Validation errors displayed with detailed messages
+  - [x] NFT exclusion warning displayed when NFTs found
+- Commit: dfa187c7c67460b01c5c2c0c938e3ff7ec669319
 
 ---
 
