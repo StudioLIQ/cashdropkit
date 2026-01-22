@@ -817,7 +817,7 @@ A ticket can be marked DONE only when:
   - [x] Abort functionality pauses execution
 - Commit: 28fd9d7e5b153e1aadd322547edc9ab626e40143
 
-### [ ] T-0504 Pause/Resume/Stop + Retry failed
+### [x] T-0504 Pause/Resume/Stop + Retry failed — DONE
 
 **Goal:** Real operational controls.
 
@@ -831,6 +831,38 @@ A ticket can be marked DONE only when:
 
 - pause then reload then resume works
 - only FAILED batches retried
+
+**Completion Details:**
+
+- Changed files: 6 files (src/core/executor/airdropExecutor.ts, src/core/executor/index.ts, src/stores/airdropStore.ts, src/stores/index.ts, src/ui/components/airdrop/wizard/ExecuteStep.tsx, src/ui/components/shell/AppShell.tsx)
+- Added to executor:
+  - `retryFailedBatches()` method with forceRebuild option
+  - `getFailedBatches()` for detailed failure info
+  - `resetBatchForRetry()` helper
+  - `rebroadcastBatch()` (MVP note: requires stored tx hex)
+- Added to airdropStore:
+  - Execution state (isExecuting, executorRef, executionProgress, failedBatches)
+  - Actions: startExecution, pauseExecution, resumeExecution, retryFailedBatches, refreshFailedBatches
+  - Global adapter integration via setGlobalAdapter/getGlobalAdapter
+- Added to ExecuteStep UI:
+  - Start/Pause/Resume buttons based on execution state
+  - Batch status table with real-time updates
+  - Failed batches section with error messages and retry button
+  - Force rebuild checkbox for retry
+  - Passphrase modal for unlocking wallet to sign
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm test` — passed (392 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Pause then reload then resume works (execution state persisted)
+  - [x] Only FAILED batches retried (getFailedBatches filters by failure)
+  - [x] Execute controls show based on state (READY/PAUSED/FAILED/RUNNING)
+  - [x] Batch list shows status (Pending/Processing/Completed/Failed)
+  - [x] Failure list shows raw error messages
+  - [x] Force rebuild option available for retry
+- Commit: a3fdc49785c9f412e908c6e1d43502939050c5e7
 
 ### [ ] T-0505 Confirmations polling + DROPPED suspicion
 
