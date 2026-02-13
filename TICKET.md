@@ -864,7 +864,7 @@ A ticket can be marked DONE only when:
   - [x] Force rebuild option available for retry
 - Commit: a3fdc49785c9f412e908c6e1d43502939050c5e7
 
-### [ ] T-0505 Confirmations polling + DROPPED suspicion
+### [x] T-0505 Confirmations polling + DROPPED suspicion — DONE
 
 **Goal:** Update SENT → CONFIRMED and handle dropped cases.
 
@@ -878,6 +878,43 @@ A ticket can be marked DONE only when:
 
 - confirmations update over time
 - stuck tx shows warning and next steps
+
+**Completion Details:**
+
+- Changed files: 7 files (4 modified, 3 created)
+- Created files:
+  - `src/core/executor/confirmationPoller.ts` — ConfirmationPoller class with periodic polling, DROPPED heuristic, auto-stop
+  - `src/core/executor/confirmationPoller.test.ts` — 22 unit tests
+- Modified files:
+  - `src/core/db/types.ts` — Added firstSeenAt field to confirmation tracking
+  - `src/core/executor/airdropExecutor.ts` — Set firstSeenAt when tracking new txid
+  - `src/core/executor/index.ts` — Export confirmation poller types
+  - `src/stores/airdropStore.ts` — Added polling state (isPolling, pollerRef, confirmationStates) + start/stop actions
+  - `src/ui/components/airdrop/wizard/ExecuteStep.tsx` — Confirmation column in batch table, DROPPED warning banner, poll toggle button, auto-start polling
+- Key features:
+  - Polls `getTxStatus` for all SEEN/UNKNOWN txids every 30s (configurable)
+  - SEEN → CONFIRMED when confirmations >= 1 (configurable minConfirmations)
+  - DROPPED suspicion: time-based heuristic (30 min default) or direct provider status
+  - Auto-stops when all txids resolved
+  - Recipient statuses updated to CONFIRMED when tx confirms
+  - DROPPED is suspicion only — does not auto-fail recipients (requires manual retry)
+  - Graceful per-txid error handling (individual failures don't stop polling)
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm format` — passed
+  - `pnpm test` — passed (414 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Confirmations update over time (SEEN → CONFIRMED when getTxStatus returns CONFIRMED)
+  - [x] Stuck tx shows warning (DROPPED banner with txid details and "retry with force rebuild" guidance)
+  - [x] Batch table shows confirmation badges (0 conf mempool / N conf / Dropped?)
+  - [x] Polling auto-starts after execution completes with pending txids
+  - [x] Poll toggle button allows manual start/stop
+  - [x] Auto-stop when all txids resolved
+  - [x] DROPPED heuristic applies after 30-min threshold
+  - [x] Provider DROPPED status honored immediately
+- Commit: 797e4332deef7db2395f82de7c5eca878530035f
 
 ---
 
@@ -1074,5 +1111,232 @@ A ticket can be marked DONE only when:
 **Acceptance:**
 
 - structured, concise, credible
-  txt
-  코드 복사
+
+---
+
+## 11) Phase 11 — Hosted Deployment Pivot (Contracts External + Vercel FE + Railway + Postgres)
+
+### [ ] T-1001 Deployment ADR + service boundary freeze
+
+**Goal:** 확정된 배포 구조를 코드 레벨 경계로 고정한다.
+
+**Deliverables:**
+
+- ADR 문서 1개 (`frontend=Vercel`, `api/worker=Railway`, `db=Railway Postgres`, `contracts=external`)
+- 컴포넌트 다이어그램(웹/API/워커/DB/컨트랙트)
+- 환경별 URL/도메인/시크릿 소유자 표
+
+**Acceptance:**
+
+- 신규 기여자가 문서만 보고 배포 구조를 오해 없이 설명 가능
+- FE와 BE 경계(책임, 데이터 소유권, 보안 경계)가 명시됨
+
+### [ ] T-1002 Runtime split: `apps/web`(Vercel) + `apps/api`(Railway) + `packages/shared`
+
+**Goal:** 단일 Next 앱 구조를 FE/BE 분리 배포 가능한 구조로 전환한다.
+
+**Deliverables:**
+
+- 워크스페이스 재구성 (`apps/web`, `apps/api`, `packages/shared`)
+- 공통 타입/스키마 공유 패키지
+- 독립 빌드/런 스크립트 (`web`, `api`)
+
+**Acceptance:**
+
+- `apps/web`만으로 Vercel 빌드 성공
+- `apps/api`만으로 Railway 런타임 부팅 성공
+
+### [ ] T-1003 Postgres schema + migration pipeline
+
+**Goal:** IndexedDB 중심 영속성을 Railway Postgres 기반으로 확장한다.
+
+**Deliverables:**
+
+- ORM/쿼리 레이어 도입 및 스키마 정의 (`wallet_meta`, `airdrop_campaigns`, `vesting_campaigns`, `execution_logs`, `token_cache`, `settings`)
+- 마이그레이션/시드 명령어
+- Railway 배포 시 자동 마이그레이션 전략
+
+**Acceptance:**
+
+- 빈 DB에서 마이그레이션 1회로 서비스 기동 가능
+- 마이그레이션 rollback/forward 시 데이터 무결성 유지
+
+### [ ] T-1004 Repository abstraction: Dexie direct 접근 제거
+
+**Goal:** 도메인 로직이 저장소 구현체(Dexie/Postgres/API)에 종속되지 않게 한다.
+
+**Deliverables:**
+
+- `core/db`를 포트/어댑터 패턴으로 리팩터링
+- FE: API repository 어댑터
+- 로컬 전용 비밀 저장소(키/니모닉)는 별도 LocalVault 어댑터로 분리
+
+**Acceptance:**
+
+- 핵심 서비스(`airdropService`, `walletService`, executor)가 Dexie import 없이 동작
+- 저장소 구현 교체 시 도메인 테스트 재사용 가능
+
+### [ ] T-1005 Non-custodial security hardening (mnemonic never server-side)
+
+**Goal:** Postgres 도입 후에도 비수탁 모델을 유지한다.
+
+**Deliverables:**
+
+- 서버 전송 금지 필드 정책(니모닉/개인키/복호화 재료)
+- API payload 필터 + 서버측 검증
+- 보안 문서 업데이트(위협 모델, 데이터 분류표)
+
+**Acceptance:**
+
+- 네트워크 트레이스에서 니모닉/개인키 관련 데이터 0건
+- 서버 DB에 민감 비밀 저장 필드가 존재하지 않음
+
+### [ ] T-1006 AuthN/AuthZ + tenant isolation for Railway API
+
+**Goal:** Postgres 다중 사용자 환경에서 데이터 격리를 보장한다.
+
+**Deliverables:**
+
+- 인증(세션 또는 JWT) 및 사용자 식별자 모델
+- 모든 캠페인/로그 조회 API에 사용자 스코프 강제
+- 권한 실패 에러 모델 표준화
+
+**Acceptance:**
+
+- 사용자 A가 사용자 B 캠페인에 접근 시 403/404 처리
+- 인증 없는 요청은 기본 차단
+
+### [ ] T-1007 API contracts for campaign/vesting/execution/report
+
+**Goal:** FE가 Railway API를 통해 CRUD/조회/리포트 동작하도록 전환한다.
+
+**Deliverables:**
+
+- REST(또는 RPC) 엔드포인트 세트
+- 요청/응답 스키마 검증(Zod 등)
+- 페이징/정렬/필터 규약
+
+**Acceptance:**
+
+- 기존 핵심 화면(airdrops/vesting/wallet/settings)이 API 기반으로 동작
+- 스키마 불일치 시 명확한 4xx 에러 반환
+
+### [ ] T-1008 Confirmation/indexing worker on Railway
+
+**Goal:** 브라우저가 닫혀도 tx 상태 업데이트를 서버에서 지속한다.
+
+**Deliverables:**
+
+- Railway worker 서비스(폴링/백오프/재시도)
+- txid 상태 갱신 잡 및 dead-letter 처리
+- 장애 모니터링 지표(실패율, 지연)
+
+**Acceptance:**
+
+- SENT tx가 시간 경과에 따라 CONFIRMED/DROPPED로 갱신
+- provider 장애 시 지수 백오프 후 자동 복구
+
+### [ ] T-1009 External contract registry integration
+
+**Goal:** 별도 배포된 컨트랙트 주소/버전을 FE+API에 안전하게 주입한다.
+
+**Deliverables:**
+
+- 네트워크별 `contract-manifest`(address, abi/version, deployedAt, chainId)
+- API/FE 공통 로더 + checksum 검증
+- 잘못된 주소/네트워크 불일치 가드
+
+**Acceptance:**
+
+- 환경별 컨트랙트 주소를 코드 변경 없이 교체 가능
+- chainId 불일치 시 트랜잭션 실행 차단
+
+### [ ] T-1010 Env matrix + runtime validation (Vercel/Railway/Postgres)
+
+**Goal:** 배포 환경 변수 누락/오입력으로 인한 런타임 장애를 차단한다.
+
+**Deliverables:**
+
+- `.env.example` 재정의(웹/서버/워커 분리)
+- 런타임 시작 시 필수 env 검증
+- Vercel/Railway 환경 변수 세팅 가이드
+
+**Acceptance:**
+
+- 필수 env 누락 시 앱이 즉시 실패(fail-fast)하고 원인 출력
+- 운영 배포에서 `.env.local` 의존 0건
+
+### [ ] T-1011 Cross-origin/session config (Vercel FE <-> Railway API)
+
+**Goal:** 분리 도메인 환경에서도 인증/요청이 안정적으로 동작하게 한다.
+
+**Deliverables:**
+
+- CORS allowlist, credentials, CSRF 전략
+- 쿠키/토큰 저장 정책(보안 속성 포함)
+- 프리플라이트 캐시/실패 케이스 테스트
+
+**Acceptance:**
+
+- 브라우저에서 CORS 오류 없이 로그인/API 호출 성공
+- CSRF/Cookie 설정이 보안 점검 체크리스트 통과
+
+### [ ] T-1012 CI/CD pipeline for Vercel + Railway
+
+**Goal:** 웹/API/워커/마이그레이션 배포를 일관된 파이프라인으로 자동화한다.
+
+**Deliverables:**
+
+- PR: lint/typecheck/test/build 게이트
+- main: web deploy + api deploy + worker deploy + migration job
+- 실패 시 롤백/재배포 절차
+
+**Acceptance:**
+
+- main 머지 후 수동 개입 없이 환경 배포 완료
+- 배포 실패 시 원인 단계가 로그에서 즉시 식별됨
+
+### [ ] T-1013 Railway infrastructure provisioning
+
+**Goal:** 운영에 필요한 Railway 리소스를 표준화한다.
+
+**Deliverables:**
+
+- 서비스 정의(API/worker/Postgres)
+- 헬스체크/오토리스타트/리소스 제한
+- 백업/복구 정책(Postgres snapshots)
+
+**Acceptance:**
+
+- 신규 환경에서 동일 설정으로 재현 배포 가능
+- DB 복구 리허설 1회 통과
+
+### [ ] T-1014 Data migration path (IndexedDB -> Postgres)
+
+**Goal:** 기존 로컬 사용자 데이터를 서버 스토리지로 안전하게 이전한다.
+
+**Deliverables:**
+
+- 내보내기(JSON) + 가져오기(API) 툴
+- 충돌 정책(중복 campaign id/name 처리)
+- 마이그레이션 검증 리포트
+
+**Acceptance:**
+
+- 샘플 사용자 데이터 이전 후 캠페인/실행 이력 정합성 유지
+- 실패 레코드가 원인과 함께 재시도 가능
+
+### [ ] T-1015 Deployment runbook + on-call checklist
+
+**Goal:** 운영 장애 대응 시간을 줄인다.
+
+**Deliverables:**
+
+- 배포 runbook(웹/API/워커/DB)
+- 장애 시나리오별 체크리스트(DB 연결 실패, provider 장애, contract mismatch)
+- 알림/대응 우선순위 표
+
+**Acceptance:**
+
+- 신규 운영자도 문서만으로 배포/복구 수행 가능
+- 주요 장애 시나리오에 대한 대응 순서가 명확함
