@@ -16,12 +16,15 @@ import {
 import type { AirdropCampaign, Network, RecipientRow, TokenRef } from '@/core/db/types';
 import {
   AirdropExecutor,
+  ConfirmationPoller,
   type ExecutionProgress,
   type ExecutorConfig,
   type ExecutorResult,
   type FailedBatchInfo,
   type RetryOptions,
+  type TxPollingState,
   createAirdropExecutor,
+  createConfirmationPoller,
 } from '@/core/executor';
 import {
   type PlannerResult,
@@ -59,6 +62,11 @@ export interface AirdropState {
   executorRef: AirdropExecutor | null;
   executionProgress: ExecutionProgress | null;
   failedBatches: FailedBatchInfo[];
+
+  // Confirmation polling state
+  isPolling: boolean;
+  pollerRef: ConfirmationPoller | null;
+  confirmationStates: TxPollingState[];
 
   // Error state
   error: string | null;
@@ -100,6 +108,10 @@ export interface AirdropState {
   ) => Promise<ExecutorResult | null>;
   refreshFailedBatches: () => void;
   setExecutorConfig: (config: ExecutorConfig) => void;
+
+  // Actions - Confirmation polling
+  startConfirmationPolling: () => void;
+  stopConfirmationPolling: () => void;
 
   // Actions - UI
   openCreateModal: () => void;
@@ -146,6 +158,9 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
   executorRef: null,
   executionProgress: null,
   failedBatches: [],
+  isPolling: false,
+  pollerRef: null,
+  confirmationStates: [],
   error: null,
 
   // Load campaigns list
@@ -637,6 +652,42 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
   setExecutorConfig: () => {
     // This is a placeholder for setting config externally
     // The actual adapter is set via setGlobalAdapter
+  },
+
+  // Confirmation polling actions
+  startConfirmationPolling: () => {
+    const campaign = get().activeCampaign;
+    if (!campaign || !campaign.execution) return;
+
+    const adapter = currentAdapter;
+    if (!adapter) return;
+
+    // Stop existing poller if any
+    const existingPoller = get().pollerRef;
+    if (existingPoller) {
+      existingPoller.stop();
+    }
+
+    const poller = createConfirmationPoller({ adapter }, campaign);
+
+    poller.onProgress((states) => {
+      set({ confirmationStates: states });
+
+      // Refresh campaign from poller to get updated recipient statuses
+      const updatedCampaign = poller.getCampaign();
+      set({ activeCampaign: { ...updatedCampaign } });
+    });
+
+    poller.start();
+    set({ isPolling: true, pollerRef: poller, confirmationStates: poller.getPollingStates() });
+  },
+
+  stopConfirmationPolling: () => {
+    const poller = get().pollerRef;
+    if (poller) {
+      poller.stop();
+    }
+    set({ isPolling: false, pollerRef: null });
   },
 
   // UI controls

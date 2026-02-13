@@ -13,19 +13,29 @@ import { unlockWallet } from '@/core/wallet';
  *
  * Provides:
  * - Start/Pause/Resume/Stop controls
- * - Batch list with status
+ * - Batch list with status + confirmation tracking
  * - Failure list with raw error messages
  * - Retry with force rebuild option
+ * - Confirmation polling with DROPPED suspicion warnings
  */
 export function ExecuteStep() {
-  const { activeCampaign, isExecuting, executionProgress, failedBatches, error } =
-    useAirdropStore();
+  const {
+    activeCampaign,
+    isExecuting,
+    executionProgress,
+    failedBatches,
+    isPolling,
+    confirmationStates,
+    error,
+  } = useAirdropStore();
   const {
     startExecution,
     pauseExecution,
     resumeExecution,
     retryFailedBatches,
     refreshFailedBatches,
+    startConfirmationPolling,
+    stopConfirmationPolling,
     clearError,
   } = useAirdropStore();
   const { wallets, activeWalletId } = useWalletStore();
@@ -42,7 +52,6 @@ export function ExecuteStep() {
 
   const execution = activeCampaign?.execution;
   const plan = activeCampaign?.plan;
-  const network = activeCampaign?.network ?? 'testnet';
 
   // Calculate batch statuses
   const completedBatches = plan?.batches.filter((b) => b.txid).length ?? 0;
@@ -54,6 +63,36 @@ export function ExecuteStep() {
     !isExecuting && execution && (execution.state === 'PAUSED' || execution.state === 'FAILED');
   const canPause = isExecuting;
   const canRetry = !isExecuting && failedBatches.length > 0;
+
+  // Check for DROPPED transactions
+  const droppedTxids = confirmationStates.filter((s) => s.status === 'DROPPED');
+  const hasPendingConfirmations = confirmationStates.some(
+    (s) => s.status === 'SEEN' || s.status === 'UNKNOWN'
+  );
+
+  // Auto-start confirmation polling when execution completes with SENT txids
+  useEffect(() => {
+    if (
+      execution &&
+      (execution.state === 'COMPLETED' || execution.state === 'PAUSED') &&
+      !isExecuting &&
+      !isPolling
+    ) {
+      const hasSeen = Object.values(execution.confirmations).some(
+        (c) => c.status === 'SEEN' || c.status === 'UNKNOWN'
+      );
+      if (hasSeen) {
+        startConfirmationPolling();
+      }
+    }
+  }, [execution?.state, isExecuting, isPolling, startConfirmationPolling, execution]);
+
+  // Clean up poller on unmount
+  useEffect(() => {
+    return () => {
+      stopConfirmationPolling();
+    };
+  }, [stopConfirmationPolling]);
 
   // Refresh failed batches when campaign execution state changes
   useEffect(() => {
@@ -75,23 +114,24 @@ export function ExecuteStep() {
         return;
       }
 
+      const network = activeCampaign?.network ?? 'testnet';
+
       // Create signer
       const signer = createLocalMnemonicSigner(unlocked.mnemonic, network);
 
       // Get derived addresses for signing
-      // Default derivation uses account 0, addresses 0 through N
       const addresses = activeWallet.addresses || [];
       const addressDerivations: AddressDerivation[] = addresses.map((addr, index) => ({
         address: addr,
-        accountIndex: 0, // Default account
-        addressIndex: index, // Sequential address index
+        accountIndex: 0,
+        addressIndex: index,
       }));
 
       const config = {
         signer,
         sourceAddress: addresses[0] || '',
         addressDerivations,
-        batchDelayMs: 1000, // 1 second between batches
+        batchDelayMs: 1000,
       };
 
       let result;
@@ -123,7 +163,7 @@ export function ExecuteStep() {
     activeWallet,
     pendingAction,
     passphrase,
-    network,
+    activeCampaign?.network,
     forceRebuild,
     startExecution,
     resumeExecution,
@@ -161,6 +201,36 @@ export function ExecuteStep() {
         return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
       default:
         return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+    }
+  };
+
+  // Get confirmation badge for a batch txid
+  const getConfirmationBadge = (txid: string | undefined) => {
+    if (!txid || !execution) return null;
+    const conf = execution.confirmations[txid];
+    if (!conf) return null;
+
+    switch (conf.status) {
+      case 'CONFIRMED':
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+            {conf.confirmations ?? 1} conf
+          </span>
+        );
+      case 'SEEN':
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+            0 conf (mempool)
+          </span>
+        );
+      case 'DROPPED':
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
+            Dropped?
+          </span>
+        );
+      default:
+        return null;
     }
   };
 
@@ -215,6 +285,44 @@ export function ExecuteStep() {
         </div>
       )}
 
+      {/* DROPPED transaction warning */}
+      {droppedTxids.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <div className="flex items-start gap-3">
+            <svg
+              className="h-5 w-5 flex-shrink-0 text-amber-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                {droppedTxids.length} transaction{droppedTxids.length > 1 ? 's' : ''} suspected
+                dropped
+              </p>
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                These transactions were not seen in the mempool or confirmed within the expected
+                timeframe. They may need to be retried with force rebuild.
+              </p>
+              <div className="mt-2 space-y-1">
+                {droppedTxids.map((tx) => (
+                  <p key={tx.txid} className="font-mono text-xs text-amber-600 dark:text-amber-400">
+                    {tx.txid.slice(0, 16)}...{tx.batchId ? ` (${tx.batchId})` : ''}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Execution status */}
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between">
@@ -227,6 +335,15 @@ export function ExecuteStep() {
                 {execution?.state || 'READY'}
               </span>
               {isExecuting && <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />}
+              {isPolling && hasPendingConfirmations && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400"
+                  title="Polling for confirmations"
+                >
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+                  Polling confirmations
+                </span>
+              )}
             </div>
           </div>
           <div className="text-right">
@@ -318,6 +435,29 @@ export function ExecuteStep() {
             Pause
           </button>
         )}
+
+        {/* Polling toggle */}
+        {execution && hasPendingConfirmations && !isExecuting && (
+          <button
+            type="button"
+            onClick={isPolling ? stopConfirmationPolling : startConfirmationPolling}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium ${
+              isPolling
+                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                : 'border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {isPolling ? 'Stop Polling' : 'Poll Confirmations'}
+          </button>
+        )}
       </div>
 
       {/* Batch status list */}
@@ -340,6 +480,9 @@ export function ExecuteStep() {
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
                       TXID
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      Confirmations
                     </th>
                   </tr>
                 </thead>
@@ -390,6 +533,9 @@ export function ExecuteStep() {
                           ) : (
                             '-'
                           )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2">
+                          {getConfirmationBadge(batch.txid)}
                         </td>
                       </tr>
                     );

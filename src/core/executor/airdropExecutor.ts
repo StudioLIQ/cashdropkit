@@ -851,9 +851,11 @@ export class AirdropExecutor {
       // 8. Track confirmation status
       const execution = this.campaign.execution;
       if (execution) {
+        const now = Date.now();
         execution.confirmations[signedTx.txid] = {
           status: 'SEEN',
-          lastCheckedAt: Date.now(),
+          lastCheckedAt: now,
+          firstSeenAt: now,
         };
       }
 

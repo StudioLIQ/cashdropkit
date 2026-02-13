@@ -16,3 +16,12 @@ export {
   type RetryOptions,
   type FailedBatchInfo,
 } from './airdropExecutor';
+
+export {
+  ConfirmationPoller,
+  createConfirmationPoller,
+  type ConfirmationPollerConfig,
+  type TxPollingState,
+  type PollingProgressCallback,
+  type PollingResult,
+} from './confirmationPoller';

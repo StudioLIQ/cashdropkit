@@ -142,6 +142,7 @@ export interface ExecutionState {
       status: ConfirmationStatus;
       confirmations?: number;
       lastCheckedAt: number;
+      firstSeenAt?: number;
     }
   >;
 
