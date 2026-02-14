@@ -964,9 +964,9 @@ A ticket can be marked DONE only when:
   - [x] Last exported filename displayed
 - Commit: f34c2d9c4d6fad9186169c856177980bbefe2f77
 
-### [ ] T-0602 Batch detail modal (debug-grade)
+### [x] T-0602 Batch detail modal (debug-grade) — DONE
 
-**Goal:** Demonstrate “engine credibility” in demos.
+**Goal:** Demonstrate "engine credibility" in demos.
 
 **Deliverables:**
 
@@ -976,6 +976,33 @@ A ticket can be marked DONE only when:
 **Acceptance:**
 
 - clicking a batch shows full details
+
+**Completion Details:**
+
+- Changed files: 2 files (1 modified, 1 created)
+- Created files:
+  - `src/ui/components/airdrop/wizard/BatchDetailModal.tsx` — Full batch detail modal
+- Modified files:
+  - `src/ui/components/airdrop/wizard/ExecuteStep.tsx` — Clickable batch rows + modal integration
+- Key features:
+  - Batch summary: recipients count, outputs, estimated size/fee
+  - TXID display with full hash (copyable) + confirmation status
+  - Failure details with raw error message
+  - Inputs breakdown: token inputs + BCH inputs with outpoint references
+  - Recipients table: address, amount, status per recipient in batch
+  - Confirmation color coding (green=confirmed, blue=mempool, red=dropped)
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm test` — passed (435 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] Clicking a batch in the status table opens the detail modal
+  - [x] Modal shows inputs/outputs breakdown
+  - [x] Modal shows recipients with status
+  - [x] Confirmation status displayed correctly
+  - [x] Failure details shown for failed batches
+- Commit: c1aba5595366f216f0129a4b2795f3a659490d8b
 
 ---
 
