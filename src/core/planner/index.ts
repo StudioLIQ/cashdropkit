@@ -5,3 +5,4 @@
  */
 
 export * from './airdropPlanner';
+export * from './vestingPlanner';
