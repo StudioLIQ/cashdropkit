@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (shared)
+        run: pnpm --filter @cashdropkit/shared typecheck
+      - name: Typecheck (api)
+        run: pnpm --filter @cashdropkit/api typecheck
+      - name: Typecheck (web)
+        run: pnpm --filter @cashdropkit/web typecheck
+      - name: Format check
+        run: pnpm format:check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Test (shared)
+        run: pnpm --filter @cashdropkit/shared test
+      - name: Test (api)
+        run: pnpm --filter @cashdropkit/api test
+      - name: Test (web)
+        run: pnpm --filter @cashdropkit/web test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build web (Next.js)
+        run: pnpm --filter @cashdropkit/web build
+      - name: Build api (TypeScript)
+        run: pnpm --filter @cashdropkit/api build
