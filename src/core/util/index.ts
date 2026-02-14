@@ -32,3 +32,5 @@ export {
   type RecipientInput,
   type RecipientValidationResult,
 } from './validate';
+
+export * from './errorTemplates';

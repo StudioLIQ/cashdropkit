@@ -7,6 +7,8 @@ import { setGlobalAdapter, useConnectionStore, useWalletStore } from '@/stores';
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
 import type { Network } from '@/core/db/types';
 
+import { ToastContainer } from '@/ui/components/toasts/ToastContainer';
+
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
@@ -118,6 +120,7 @@ export function AppShell({ children }: AppShellProps) {
         />
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+      <ToastContainer />
     </div>
   );
 }
