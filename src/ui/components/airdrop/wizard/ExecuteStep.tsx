@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAirdropStore, useWalletStore } from '@/stores';
 
+import type { BatchPlan } from '@/core/db/types';
 import type { AddressDerivation } from '@/core/signer';
 import { createLocalMnemonicSigner } from '@/core/signer';
 import { unlockWallet } from '@/core/wallet';
+
+import { BatchDetailModal } from './BatchDetailModal';
 
 /**
  * Execute Step Component
@@ -46,6 +49,9 @@ export function ExecuteStep() {
   const [pendingAction, setPendingAction] = useState<'start' | 'resume' | 'retry' | null>(null);
   const [forceRebuild, setForceRebuild] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<{ batch: BatchPlan; index: number } | null>(
+    null
+  );
 
   // Get active wallet
   const activeWallet = wallets.find((w) => w.id === activeWalletId);
@@ -495,7 +501,8 @@ export function ExecuteStep() {
                     return (
                       <tr
                         key={batch.id}
-                        className={isCurrentBatch ? 'bg-amber-50 dark:bg-amber-900/20' : ''}
+                        className={`cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${isCurrentBatch ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}
+                        onClick={() => setSelectedBatch({ batch, index })}
                       >
                         <td className="whitespace-nowrap px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100">
                           {index + 1}
@@ -615,6 +622,16 @@ export function ExecuteStep() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Batch detail modal */}
+      {selectedBatch && activeCampaign && (
+        <BatchDetailModal
+          campaign={activeCampaign}
+          batch={selectedBatch.batch}
+          batchIndex={selectedBatch.index}
+          onClose={() => setSelectedBatch(null)}
+        />
       )}
 
       {/* Passphrase modal */}
