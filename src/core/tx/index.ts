@@ -7,3 +7,4 @@
 export * from './feeEstimator';
 export * from './tokenTxBuilder';
 export * from './lockboxScripts';
+export * from './unlockTxBuilder';

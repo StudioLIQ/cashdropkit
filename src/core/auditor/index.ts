@@ -18,3 +18,5 @@ export {
   type ReportMetadata,
   type JsonReport,
 } from './reportExporter';
+
+export { buildClaimBundle, exportClaimBundle, downloadClaimBundle } from './claimBundleExporter';
