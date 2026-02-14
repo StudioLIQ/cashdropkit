@@ -6,3 +6,4 @@
 
 export * from './feeEstimator';
 export * from './tokenTxBuilder';
+export * from './lockboxScripts';
