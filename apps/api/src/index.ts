@@ -6,44 +6,85 @@
  * Secrets (mnemonic/keys) NEVER reach this server.
  */
 
-import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { createServer } from 'node:http';
+
+import {
+  createCampaign,
+  createVestingCampaign,
+  deleteCampaign,
+  getCampaign,
+  getVestingCampaign,
+  listCampaigns,
+  listVestingCampaigns,
+  updateCampaign,
+} from './routes/campaigns.js';
+import { Router, json } from './routes/router.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-function json(res: ServerResponse, status: number, data: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(data));
-}
+// ============================================================================
+// Router Setup
+// ============================================================================
 
-function handleRequest(req: IncomingMessage, res: ServerResponse): void {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+const router = new Router();
 
-  // Health check
-  if (url.pathname === '/health' && req.method === 'GET') {
-    json(res, 200, {
-      status: 'ok',
-      service: '@cashdropkit/api',
-      version: '0.1.0',
-      uptime: process.uptime(),
-    });
-    return;
-  }
+// Public routes (no auth required)
+router.public('/health');
+router.public('/api/v1');
 
-  // API version
-  if (url.pathname === '/api/v1' && req.method === 'GET') {
-    json(res, 200, {
-      version: '0.1.0',
-      endpoints: ['/health', '/api/v1'],
-    });
-    return;
-  }
+router.get('/health', async (ctx) => {
+  json(ctx.res, 200, {
+    status: 'ok',
+    service: '@cashdropkit/api',
+    version: '0.1.0',
+    uptime: process.uptime(),
+  });
+});
 
-  // 404 for everything else
-  json(res, 404, { error: 'Not Found', path: url.pathname });
-}
+router.get('/api/v1', async (ctx) => {
+  json(ctx.res, 200, {
+    version: '0.1.0',
+    endpoints: {
+      health: 'GET /health',
+      campaigns: {
+        list: 'GET /api/v1/campaigns',
+        get: 'GET /api/v1/campaigns/:id',
+        create: 'POST /api/v1/campaigns',
+        update: 'PATCH /api/v1/campaigns/:id',
+        delete: 'DELETE /api/v1/campaigns/:id',
+      },
+      vesting: {
+        list: 'GET /api/v1/vesting',
+        get: 'GET /api/v1/vesting/:id',
+        create: 'POST /api/v1/vesting',
+      },
+    },
+  });
+});
 
-const server = createServer(handleRequest);
+// Airdrop campaign routes
+router.get('/api/v1/campaigns', listCampaigns);
+router.get('/api/v1/campaigns/:id', getCampaign);
+router.post('/api/v1/campaigns', createCampaign);
+router.patch('/api/v1/campaigns/:id', updateCampaign);
+router.delete('/api/v1/campaigns/:id', deleteCampaign);
+
+// Vesting campaign routes
+router.get('/api/v1/vesting', listVestingCampaigns);
+router.get('/api/v1/vesting/:id', getVestingCampaign);
+router.post('/api/v1/vesting', createVestingCampaign);
+
+// ============================================================================
+// Server
+// ============================================================================
+
+const server = createServer((req, res) => {
+  router.handle(req, res).catch((err) => {
+    console.error('Unhandled error:', err);
+    json(res, 500, { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+  });
+});
 
 server.listen(PORT, HOST, () => {
   console.log(`@cashdropkit/api listening on http://${HOST}:${PORT}`);
