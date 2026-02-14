@@ -920,7 +920,7 @@ A ticket can be marked DONE only when:
 
 ## 7) Phase 6 — Auditor / Export
 
-### [ ] T-0601 Report export (CSV/JSON/txids.txt)
+### [x] T-0601 Report export (CSV/JSON/txids.txt) — DONE
 
 **Goal:** Produce community-proof artifacts.
 
@@ -933,6 +933,36 @@ A ticket can be marked DONE only when:
 
 - includes address↔amount↔status↔txid
 - includes errors for failed/invalid rows
+
+**Completion Details:**
+
+- Changed files: 4 files (1 modified, 3 created)
+- Created files:
+  - `src/core/auditor/reportExporter.ts` — CSV/JSON/txids exporters with browser download
+  - `src/core/auditor/reportExporter.test.ts` — 21 unit tests
+  - `src/core/auditor/index.ts` — Module exports
+- Modified files:
+  - `src/ui/components/airdrop/wizard/ReportStep.tsx` — Working export buttons replacing placeholder
+- Key features:
+  - CSV export: header + per-recipient rows (address, amount_base, status, txid, batch_id, error, memo)
+  - JSON export: versioned report with metadata (campaign info, stats, batch counts) + recipients + txids
+  - TXIDs export: deduplicated sorted txid list
+  - CSV field escaping (commas, quotes, newlines)
+  - Filename sanitization + timestamp
+  - Browser download via Blob URL
+- Commands run:
+  - `pnpm typecheck` — passed (0 errors)
+  - `pnpm lint` — passed (0 errors, 2 pre-existing warnings)
+  - `pnpm test` — passed (435 tests, 3 skipped integration)
+  - `pnpm build` — passed
+- Manual QA:
+  - [x] CSV includes address↔amount↔status↔txid per recipient
+  - [x] CSV includes errors for failed rows
+  - [x] JSON includes full metadata + recipients + txids
+  - [x] TXIDs file contains deduplicated sorted list
+  - [x] Export buttons trigger browser download
+  - [x] Last exported filename displayed
+- Commit: f34c2d9c4d6fad9186169c856177980bbefe2f77
 
 ### [ ] T-0602 Batch detail modal (debug-grade)
 
