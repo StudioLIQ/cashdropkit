@@ -34,3 +34,4 @@ export {
 } from './validate';
 
 export * from './errorTemplates';
+export * from './demoPreset';

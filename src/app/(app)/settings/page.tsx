@@ -1,4 +1,21 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+
+import { downloadAsFile, generateSampleCsv, getDemoPresetSummary } from '@/core/util/demoPreset';
+
 export default function SettingsPage() {
+  const [csvGenerated, setCsvGenerated] = useState(false);
+
+  const handleDownloadSampleCsv = useCallback(() => {
+    const csv = generateSampleCsv();
+    downloadAsFile(csv, 'sample_airdrop_recipients.csv', 'text/csv');
+    setCsvGenerated(true);
+    setTimeout(() => setCsvGenerated(false), 3000);
+  }, []);
+
+  const demoSummary = getDemoPresetSummary();
+
   return (
     <div className="space-y-6">
       <div>
@@ -119,6 +136,37 @@ export default function SettingsPage() {
                 <option value="mainnet">Mainnet</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Demo Preset Section */}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800 dark:bg-emerald-950">
+          <h2 className="text-lg font-medium text-emerald-900 dark:text-emerald-100">
+            Demo Preset
+          </h2>
+          <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+            Download sample data and use demo settings for a quick demonstration.
+          </p>
+
+          <div className="mt-4 space-y-2">
+            {demoSummary.items.map((item) => (
+              <div key={item.key} className="flex items-center justify-between text-sm">
+                <span className="text-emerald-700 dark:text-emerald-400">{item.key}</span>
+                <span className="font-mono text-emerald-900 dark:text-emerald-200">
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={handleDownloadSampleCsv}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+            >
+              {csvGenerated ? 'Downloaded!' : 'Download Sample CSV'}
+            </button>
           </div>
         </div>
 
