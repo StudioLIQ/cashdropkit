@@ -11,9 +11,12 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@types/node": "^20",
+    "typescript": "^5",
+    "vitest": "^4.0.17"
   }
 }
