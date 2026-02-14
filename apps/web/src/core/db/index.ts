@@ -1,7 +1,18 @@
 // Database instance
 export { CashDropDatabase, closeDb, deleteDb, getDb } from './db';
 
-// Repositories
+// Repository Ports (interfaces)
+export type {
+  AirdropRepository,
+  LogRepository,
+  RepositoryRegistry,
+  SettingsRepository,
+  TokenMetadataRepository,
+  VestingRepository,
+  WalletRepository,
+} from './ports';
+
+// Dexie Repository Adapters (default implementations)
 export {
   airdropRepo,
   logRepo,
