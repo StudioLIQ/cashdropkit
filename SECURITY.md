@@ -196,6 +196,61 @@ If you discover a security vulnerability:
 3. Include: description, reproduction steps, potential impact
 4. Allow reasonable time for fix before disclosure
 
+## Hosted Deployment: Data Classification
+
+When deployed in hosted mode (Vercel + Railway + Postgres), the non-custodial model is preserved through strict data classification.
+
+### Classification Table
+
+| Classification | Data | Browser | Server DB | API Payload |
+|---------------|------|---------|-----------|-------------|
+| **SECRET** | Mnemonic phrase | IndexedDB (AES-256-GCM) | NEVER | NEVER |
+| **SECRET** | Private keys | Memory only | NEVER | NEVER |
+| **SECRET** | Encryption key (derived) | Memory only | NEVER | NEVER |
+| **SECRET** | User passphrase | Memory only (transient) | NEVER | NEVER |
+| **SECRET** | Signed tx hex | Memory only (ephemeral) | NEVER | Broadcast relay only |
+| **INTERNAL** | Encryption salt/IV | IndexedDB | NEVER | NEVER |
+| **PUBLIC** | Addresses (derived) | IndexedDB + display | Read/Write | Read/Write |
+| **PUBLIC** | Campaign config | Display | Read/Write | Read/Write |
+| **PUBLIC** | Execution state | Display | Read/Write | Read/Write |
+| **PUBLIC** | Token metadata | Cache | Cache | Read/Write |
+| **PUBLIC** | Transaction IDs | Display | Read/Write | Read/Write |
+
+### Server-Side Enforcement
+
+The API server enforces the non-custodial boundary via:
+
+1. **Payload filter**: All incoming requests are scanned for forbidden fields (mnemonic, privateKey, encryptionKey, passphrase, etc.). Requests containing secrets are **rejected** (HTTP 400).
+2. **Schema enforcement**: The Postgres schema contains NO columns for mnemonic, private keys, or encryption material.
+3. **Response stripping**: Outbound responses are scanned to prevent accidental secret leakage.
+4. **Forbidden field list**: Maintained in `apps/api/src/middleware/secretFilter.ts`.
+
+### Signing Flow (Hosted Mode)
+
+```
+Browser                          API Server
+  |                                |
+  |  1. Fetch campaign + UTXOs     |
+  |  <----- campaign data ------   |
+  |                                |
+  |  2. Build unsigned tx          |
+  |  (browser-side, using UTXOs)   |
+  |                                |
+  |  3. Sign tx locally            |
+  |  (mnemonic never leaves)       |
+  |                                |
+  |  4. Compute txid locally       |
+  |                                |
+  |  5. Persist SENT state ------> |
+  |  (txid + recipient status)     |
+  |                                |
+  |  6. Broadcast signed tx -----> |
+  |  (relay only, no key access)   |
+  |                                |
+  |  7. Server polls confirmation  |
+  |  <----- status updates ------  |
+```
+
 ## Audit Status
 
 This software has not been formally audited. Use at your own risk, especially for large-value operations.
