@@ -246,6 +246,38 @@ export function buildP2PKHScript(pubkeyHash: Uint8Array): Uint8Array {
 }
 
 /**
+ * Build a P2SH locking script from a script hash
+ */
+export function buildP2SHScript(scriptHash: Uint8Array): Uint8Array {
+  // OP_HASH160 <20 bytes> OP_EQUAL
+  // a9 14 <hash> 87
+  const script = new Uint8Array(23);
+  script[0] = 0xa9; // OP_HASH160
+  script[1] = 0x14; // Push 20 bytes
+  script.set(scriptHash, 2);
+  script[22] = 0x87; // OP_EQUAL
+  return script;
+}
+
+/**
+ * Build a token output locking script to a P2SH address (for lockboxes)
+ */
+export function buildTokenP2SHScript(
+  scriptHash: Uint8Array,
+  category: string,
+  amount: bigint
+): Uint8Array {
+  const tokenPrefix = buildTokenPrefix(category, amount);
+  const p2shScript = buildP2SHScript(scriptHash);
+
+  const result = new Uint8Array(tokenPrefix.length + p2shScript.length);
+  result.set(tokenPrefix, 0);
+  result.set(p2shScript, tokenPrefix.length);
+
+  return result;
+}
+
+/**
  * Build a CashToken prefix for a fungible token output
  */
 export function buildTokenPrefix(category: string, amount: bigint): Uint8Array {

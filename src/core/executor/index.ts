@@ -25,3 +25,13 @@ export {
   type PollingProgressCallback,
   type PollingResult,
 } from './confirmationPoller';
+
+export {
+  VestingExecutor,
+  createVestingExecutor,
+  type VestingExecutorConfig,
+  type VestingBatchResult,
+  type VestingProgress,
+  type VestingProgressCallback,
+  type VestingExecutorResult,
+} from './vestingExecutor';
