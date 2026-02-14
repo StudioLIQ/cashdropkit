@@ -1,9 +1,22 @@
 'use client';
 
+import { useState } from 'react';
+
 import { useAirdropStore } from '@/stores';
 
+import { type ExportFormat, downloadExport, exportReport } from '@/core/auditor';
+
+/**
+ * Report Step Component
+ *
+ * Provides:
+ * - Summary statistics (sent/confirmed/failed/skipped)
+ * - Export buttons: CSV, JSON, TXIDs
+ * - Campaign metadata display
+ */
 export function ReportStep() {
   const { activeCampaign } = useAirdropStore();
+  const [lastExported, setLastExported] = useState<string | null>(null);
 
   if (!activeCampaign) return null;
 
@@ -16,6 +29,12 @@ export function ReportStep() {
     confirmed: recipients.filter((r) => r.status === 'CONFIRMED').length,
     failed: recipients.filter((r) => r.status === 'FAILED').length,
     skipped: recipients.filter((r) => r.status === 'SKIPPED').length,
+  };
+
+  const handleExport = (format: ExportFormat) => {
+    const result = exportReport(activeCampaign, format);
+    downloadExport(result);
+    setLastExported(result.filename);
   };
 
   return (
@@ -61,74 +80,64 @@ export function ReportStep() {
         </div>
       </div>
 
-      {/* Export options placeholder */}
-      <div className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-700 dark:bg-zinc-800/50">
-        <svg
-          className="mx-auto h-12 w-12 text-zinc-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        <h3 className="mt-4 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          Export Options
-        </h3>
+      {/* Export buttons */}
+      <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Export Report</h3>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Export functionality will be implemented in T-0601.
+          Download the distribution report in your preferred format.
         </p>
-        <div className="mt-4 flex justify-center gap-2">
+        <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            onClick={() => handleExport('csv')}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
             Export CSV
           </button>
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            onClick={() => handleExport('json')}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
             Export JSON
           </button>
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            onClick={() => handleExport('txids')}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
             TXIDs Only
           </button>
         </div>
+        {lastExported && (
+          <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400">
+            Downloaded: {lastExported}
+          </p>
+        )}
       </div>
 
       {/* Report fields info */}
@@ -145,15 +154,15 @@ export function ReportStep() {
           Report Contents
         </h3>
         <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-          The export will include the following fields per recipient:
+          Each export includes the following fields per recipient:
         </p>
         <ul className="mt-2 space-y-1 text-sm text-blue-600 dark:text-blue-400">
-          <li>• Address (normalized cashaddr)</li>
-          <li>• Amount (base units)</li>
-          <li>• Status (SENT/CONFIRMED/FAILED/SKIPPED)</li>
-          <li>• Transaction ID (txid)</li>
-          <li>• Error message (if failed)</li>
-          <li>• Memo (if provided)</li>
+          <li>Address (normalized cashaddr)</li>
+          <li>Amount (base units)</li>
+          <li>Status (SENT/CONFIRMED/FAILED/SKIPPED)</li>
+          <li>Transaction ID (txid)</li>
+          <li>Error message (if failed)</li>
+          <li>Memo (if provided)</li>
         </ul>
       </div>
 
