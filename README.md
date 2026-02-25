@@ -144,8 +144,6 @@ Manage all environment variables in root `.env.local`:
 
 ```bash
 # Web (testnet only)
-NEXT_PUBLIC_API_URL=https://api.cashdropkit.com
-NEXT_PUBLIC_API_ACCESS_TOKEN=replace-with-shared-api-token
 NEXT_PUBLIC_DEFAULT_NETWORK=testnet
 NEXT_PUBLIC_TESTNET_ELECTRUM_URL=wss://chipnet.imaginary.cash:50004
 NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
@@ -158,8 +156,12 @@ API_ACCESS_TOKEN=replace-with-same-shared-api-token
 ELECTRUM_TESTNET_URL=wss://chipnet.imaginary.cash:50004
 ```
 
-For hosted mode, set the same token value in both `NEXT_PUBLIC_API_ACCESS_TOKEN` (Vercel) and `API_ACCESS_TOKEN` (Railway).  
-`SESSION_SECRET` is still supported for JWT auth, but not required when `API_ACCESS_TOKEN` is configured.
+FE의 API endpoint/token은 소스에 하드코딩되어 있습니다:
+- API URL: `https://api.cashdropkit.com`
+- Bearer token: `cashdropkit-public-client-token`
+
+따라서 Vercel에는 FE API env를 넣지 않아도 됩니다.  
+Railway에는 `API_ACCESS_TOKEN=cashdropkit-public-client-token`을 반드시 설정하세요.
 
 Useful commands:
 
@@ -173,7 +175,7 @@ Production target values:
 - Web domains: `https://cashdropkit.com`, `https://www.cashdropkit.com`
 - API domain: `https://api.cashdropkit.com`
 - `CORS_ALLOWED_ORIGINS` must include both web domains
-- `NEXT_PUBLIC_API_URL` should be `https://api.cashdropkit.com`
+- `API_ACCESS_TOKEN` must match FE hardcoded token
 
 ## Tech Stack
 

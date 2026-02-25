@@ -17,8 +17,8 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').trim().replace(/\/+$/, '');
-const API_ACCESS_TOKEN = (process.env.NEXT_PUBLIC_API_ACCESS_TOKEN ?? '').trim();
+const API_BASE_URL = 'https://api.cashdropkit.com';
+const API_ACCESS_TOKEN = 'cashdropkit-public-client-token';
 
 if (API_BASE_URL) {
   initApiClient({

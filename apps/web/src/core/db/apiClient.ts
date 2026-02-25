@@ -2,7 +2,7 @@
  * API Client for Railway backend
  *
  * Standardized HTTP client for all API calls.
- * Reads NEXT_PUBLIC_API_URL from env; falls back to Dexie when absent.
+ * Initialized by app bootstrap; falls back to Dexie repositories when absent.
  */
 
 export interface ApiClientConfig {

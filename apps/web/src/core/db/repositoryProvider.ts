@@ -2,7 +2,7 @@
  * Repository Provider
  *
  * Selects the correct repository implementation:
- * - If NEXT_PUBLIC_API_URL is set → use API adapters (for hosted mode)
+ * - If API client is initialized → use API adapters (for hosted mode)
  * - Otherwise → use Dexie adapters (local-first mode)
  *
  * Wallet, Settings, and TokenMetadata always use Dexie (browser-only).
