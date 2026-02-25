@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
+    "start:worker": "node --import tsx src/worker/main.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
