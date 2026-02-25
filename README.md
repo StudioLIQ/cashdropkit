@@ -144,7 +144,7 @@ Manage all environment variables in root `.env.local`:
 
 ```bash
 # Web (testnet only)
-NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_URL=https://api.cashdropkit.com
 NEXT_PUBLIC_DEFAULT_NETWORK=testnet
 NEXT_PUBLIC_TESTNET_ELECTRUM_URL=wss://chipnet.imaginary.cash:50004
 NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
@@ -152,7 +152,7 @@ NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
 # API (testnet only)
 DATABASE_URL=postgresql://user:password@localhost:5432/cashdropkit
 SESSION_SECRET=replace-with-random-64-char-hex
-CORS_ALLOWED_ORIGINS=http://localhost:3000
+CORS_ALLOWED_ORIGINS=https://cashdropkit.com,https://www.cashdropkit.com,http://localhost:3000
 ELECTRUM_TESTNET_URL=wss://chipnet.imaginary.cash:50004
 ```
 
