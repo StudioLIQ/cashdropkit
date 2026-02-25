@@ -15,7 +15,6 @@ export interface EnvConfig {
   ELECTRUM_TESTNET_URL: string;
 
   // Optional with defaults
-  ELECTRUM_MAINNET_URL: string;
   WORKER_POLL_INTERVAL_MS: number;
   WORKER_DROPPED_THRESHOLD_MS: number;
   PORT: number;
@@ -50,11 +49,6 @@ const ENV_RULES: EnvRule[] = [
     key: 'ELECTRUM_TESTNET_URL',
     required: true,
     validate: (v) => (v.startsWith('wss://') || v.startsWith('ws://') ? null : 'Must start with wss:// or ws://'),
-  },
-  {
-    key: 'ELECTRUM_MAINNET_URL',
-    required: false,
-    defaultValue: '',
   },
   {
     key: 'WORKER_POLL_INTERVAL_MS',
@@ -143,7 +137,6 @@ export function getEnvConfig(): EnvConfig {
     SESSION_SECRET: process.env.SESSION_SECRET!,
     CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS || '*',
     ELECTRUM_TESTNET_URL: process.env.ELECTRUM_TESTNET_URL!,
-    ELECTRUM_MAINNET_URL: process.env.ELECTRUM_MAINNET_URL || '',
     WORKER_POLL_INTERVAL_MS: parseInt(process.env.WORKER_POLL_INTERVAL_MS || '30000'),
     WORKER_DROPPED_THRESHOLD_MS: parseInt(process.env.WORKER_DROPPED_THRESHOLD_MS || '1800000'),
     PORT: parseInt(process.env.PORT || '3001'),

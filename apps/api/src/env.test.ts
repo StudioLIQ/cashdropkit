@@ -55,7 +55,6 @@ describe('env validation', () => {
   });
 
   it('allows optional variables to be missing', () => {
-    delete process.env.ELECTRUM_MAINNET_URL;
     delete process.env.WORKER_POLL_INTERVAL_MS;
     expect(validateEnv()).toEqual([]);
   });
