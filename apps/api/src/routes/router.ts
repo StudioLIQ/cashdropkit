@@ -3,12 +3,15 @@
  *
  * Simple pattern-matching router built on Node.js http module.
  * Routes are matched by method + path pattern.
+ * CORS is handled via the dedicated middleware (not inline).
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { AuthUser } from '../auth/index.js';
 import { authenticateRequest, getJwtSecret } from '../auth/index.js';
+import type { CorsConfig } from '../middleware/cors.js';
+import { applyCorsHeaders, handlePreflight, parseCorsConfig } from '../middleware/cors.js';
 import { filterSecrets } from '../middleware/secretFilter.js';
 
 export interface RouteContext {
@@ -32,6 +35,11 @@ interface Route {
 export class Router {
   private routes: Route[] = [];
   private publicPaths = new Set<string>(['/health', '/api/v1']);
+  private corsConfig: CorsConfig;
+
+  constructor() {
+    this.corsConfig = parseCorsConfig(process.env.CORS_ALLOWED_ORIGINS);
+  }
 
   /**
    * Register a route with optional path parameters (e.g., /api/v1/campaigns/:id).
@@ -85,15 +93,13 @@ export class Router {
     const method = (req.method || 'GET').toUpperCase();
     const pathname = url.pathname;
 
-    // CORS preflight
-    if (method === 'OPTIONS') {
-      setCorsHeaders(res);
-      res.writeHead(204);
-      res.end();
+    // CORS preflight (OPTIONS) — handled by dedicated middleware
+    if (handlePreflight(req, res, this.corsConfig)) {
       return;
     }
 
-    setCorsHeaders(res);
+    // Apply CORS headers for all responses
+    applyCorsHeaders(req, res, this.corsConfig);
 
     // Match route
     for (const route of this.routes) {
@@ -187,14 +193,6 @@ export class Router {
 export function json(res: ServerResponse, status: number, data: unknown): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
-}
-
-function setCorsHeaders(res: ServerResponse): void {
-  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS || '*';
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigins);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400');
 }
 
 function parseJsonBody(req: IncomingMessage): Promise<unknown> {

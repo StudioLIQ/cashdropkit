@@ -1,6 +1,20 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
+
 import { describe, expect, it } from 'vitest';
 
-import { isOriginAllowed, parseCorsConfig } from './cors.js';
+import { applyCorsHeaders, isOriginAllowed, parseCorsConfig } from './cors.js';
+
+function mockReqRes(origin?: string) {
+  const headers: Record<string, string | undefined> = {};
+  const req = { headers: { origin }, method: 'GET' } as unknown as IncomingMessage;
+  const res = {
+    setHeader: (key: string, value: string) => {
+      headers[key] = value;
+    },
+    getHeader: (key: string) => headers[key],
+  } as unknown as ServerResponse;
+  return { req, res, headers };
+}
 
 describe('CORS middleware', () => {
   describe('parseCorsConfig', () => {
@@ -27,6 +41,16 @@ describe('CORS middleware', () => {
     it('filters empty values', () => {
       const config = parseCorsConfig('http://a.com,,http://b.com,');
       expect(config.allowedOrigins).toEqual(['http://a.com', 'http://b.com']);
+    });
+
+    it('enables credentials for explicit allowlist', () => {
+      const config = parseCorsConfig('http://localhost:3000');
+      expect(config.credentials).toBe(true);
+    });
+
+    it('disables credentials for wildcard', () => {
+      const config = parseCorsConfig('*');
+      expect(config.credentials).toBe(false);
     });
   });
 
@@ -55,6 +79,54 @@ describe('CORS middleware', () => {
     it('is case-sensitive for origins', () => {
       const config = parseCorsConfig('http://localhost:3000');
       expect(isOriginAllowed('HTTP://LOCALHOST:3000', config)).toBe(false);
+    });
+  });
+
+  describe('applyCorsHeaders', () => {
+    it('reflects allowed origin and sets Vary: Origin', () => {
+      const config = parseCorsConfig('http://localhost:3000');
+      const { req, res, headers } = mockReqRes('http://localhost:3000');
+      applyCorsHeaders(req, res, config);
+
+      expect(headers['Access-Control-Allow-Origin']).toBe('http://localhost:3000');
+      expect(headers['Vary']).toBe('Origin');
+      expect(headers['Access-Control-Allow-Credentials']).toBe('true');
+    });
+
+    it('does NOT set ACAO for disallowed origin', () => {
+      const config = parseCorsConfig('http://localhost:3000');
+      const { req, res, headers } = mockReqRes('http://evil.com');
+      applyCorsHeaders(req, res, config);
+
+      expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+    });
+
+    it('uses * for wildcard mode without Vary', () => {
+      const config = parseCorsConfig('*');
+      const { req, res, headers } = mockReqRes('http://any.com');
+      applyCorsHeaders(req, res, config);
+
+      expect(headers['Access-Control-Allow-Origin']).toBe('*');
+      expect(headers['Vary']).toBeUndefined();
+      expect(headers['Access-Control-Allow-Credentials']).toBeUndefined();
+    });
+
+    it('does not set credentials with wildcard origin', () => {
+      const config = parseCorsConfig('*');
+      const { req, res, headers } = mockReqRes('http://any.com');
+      applyCorsHeaders(req, res, config);
+
+      expect(headers['Access-Control-Allow-Credentials']).toBeUndefined();
+    });
+
+    it('always sets methods, headers, expose, max-age', () => {
+      const config = parseCorsConfig('http://localhost:3000');
+      const { req, res, headers } = mockReqRes('http://localhost:3000');
+      applyCorsHeaders(req, res, config);
+
+      expect(headers['Access-Control-Allow-Methods']).toContain('GET');
+      expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
+      expect(headers['Access-Control-Max-Age']).toBe('86400');
     });
   });
 });
