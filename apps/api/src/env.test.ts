@@ -12,7 +12,7 @@ describe('env validation', () => {
       DATABASE_URL: 'postgresql://user:pass@localhost:5432/cashdropkit',
       SESSION_SECRET: 'a'.repeat(32),
       CORS_ALLOWED_ORIGINS: 'http://localhost:3000',
-      ELECTRUM_MAINNET_URL: 'wss://bch.imaginary.cash:50004',
+      ELECTRUM_TESTNET_URL: 'wss://chipnet.imaginary.cash:50004',
     };
   });
 
@@ -48,14 +48,14 @@ describe('env validation', () => {
     expect(errors.some((e) => e.includes('SESSION_SECRET'))).toBe(true);
   });
 
-  it('detects invalid ELECTRUM_MAINNET_URL', () => {
-    process.env.ELECTRUM_MAINNET_URL = 'http://not-websocket';
+  it('detects invalid ELECTRUM_TESTNET_URL', () => {
+    process.env.ELECTRUM_TESTNET_URL = 'http://not-websocket';
     const errors = validateEnv();
-    expect(errors.some((e) => e.includes('ELECTRUM_MAINNET_URL'))).toBe(true);
+    expect(errors.some((e) => e.includes('ELECTRUM_TESTNET_URL'))).toBe(true);
   });
 
   it('allows optional variables to be missing', () => {
-    delete process.env.ELECTRUM_TESTNET_URL;
+    delete process.env.ELECTRUM_MAINNET_URL;
     delete process.env.WORKER_POLL_INTERVAL_MS;
     expect(validateEnv()).toEqual([]);
   });

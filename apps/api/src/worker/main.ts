@@ -58,7 +58,7 @@ function createTxStatusProvider(): TxStatusProvider {
       // For MVP, use a simple fetch to the Electrum server
       // Most Electrum servers expose blockchain.transaction.get over JSON-RPC
       try {
-        const url = config.ELECTRUM_MAINNET_URL;
+        const url = config.ELECTRUM_TESTNET_URL;
         if (!url) {
           return { status: 'error', error: 'No Electrum URL configured' };
         }

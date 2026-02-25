@@ -427,7 +427,7 @@ let tokenServiceInstance: TokenService | null = null;
 /**
  * Get the token service singleton
  */
-export function getTokenService(network: Network = 'mainnet'): TokenService {
+export function getTokenService(network: Network = 'testnet'): TokenService {
   if (!tokenServiceInstance) {
     tokenServiceInstance = new TokenService({ network });
   } else if (tokenServiceInstance['config'].network !== network) {

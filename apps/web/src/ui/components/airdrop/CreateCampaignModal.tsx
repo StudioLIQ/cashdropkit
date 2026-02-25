@@ -144,8 +144,7 @@ export function CreateCampaignModal({
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              The campaign will use the currently selected network. You can change this in the
-              topbar.
+              Campaigns are currently limited to testnet (Chipnet).
             </p>
           </div>
         </div>

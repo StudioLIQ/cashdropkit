@@ -45,7 +45,7 @@ const initialState = {
   manualDecimals: null,
   showManualDecimalsInput: false,
   selectedToken: null,
-  network: 'mainnet' as Network,
+  network: 'testnet' as Network,
 };
 
 export const useTokenStore = create<TokenState>((set, get) => ({

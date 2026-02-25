@@ -73,6 +73,7 @@ export function AppShell({ children }: AppShellProps) {
   // Handle network change
   const handleNetworkChange = useCallback(
     async (newNetwork: Network) => {
+      if (newNetwork !== 'testnet') return;
       if (newNetwork === network) return;
 
       setNetwork(newNetwork);

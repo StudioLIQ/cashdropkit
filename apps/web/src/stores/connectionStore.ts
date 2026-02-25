@@ -91,9 +91,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   setStatus: (status) => set({ status }),
 
   // Set network (triggers reconnection in service)
-  setNetwork: (network) =>
+  setNetwork: (_network) =>
     set({
-      network,
+      network: 'testnet',
       status: 'offline',
       consecutiveFailures: 0,
       lastHealthCheck: null,

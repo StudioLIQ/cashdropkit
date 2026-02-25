@@ -102,7 +102,6 @@ function NetworkSelector({
       className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
     >
       <option value="testnet">Testnet (Chipnet)</option>
-      <option value="mainnet">Mainnet</option>
     </select>
   );
 }

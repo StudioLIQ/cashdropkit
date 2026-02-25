@@ -55,6 +55,10 @@ export class ConnectionService {
   private listeners: Set<ConnectionEventListener> = new Set();
   private isRunning = false;
 
+  private resolveSupportedNetwork(_network: Network): Network {
+    return 'testnet';
+  }
+
   constructor(config: Partial<ConnectionServiceConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -108,13 +112,14 @@ export class ConnectionService {
     // Stop existing connection if any
     this.stop();
 
-    this.network = network;
+    const targetNetwork = this.resolveSupportedNetwork(network);
+    this.network = targetNetwork;
     this.isRunning = true;
 
     // Create adapter
     this.adapter = createElectrumAdapter({
-      network,
-      wsUrl: DEFAULT_ELECTRUM_ENDPOINTS[network],
+      network: targetNetwork,
+      wsUrl: DEFAULT_ELECTRUM_ENDPOINTS[targetNetwork],
     });
 
     // Perform initial health check

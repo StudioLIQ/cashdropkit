@@ -13,6 +13,12 @@ import { airdropCampaigns, vestingCampaigns } from '../db/schema.js';
 import type { RouteContext } from './router.js';
 import { json, parsePagination } from './router.js';
 
+const SUPPORTED_NETWORK = 'testnet' as const;
+
+function isSupportedNetwork(network: unknown): network is typeof SUPPORTED_NETWORK {
+  return network === SUPPORTED_NETWORK;
+}
+
 // ============================================================================
 // Airdrop Campaigns
 // ============================================================================
@@ -23,10 +29,18 @@ export async function listCampaigns(ctx: RouteContext): Promise<void> {
   const { page, pageSize } = parsePagination(ctx.query);
   const network = ctx.query.get('network');
 
-  const conditions = [eq(airdropCampaigns.userId, ctx.user.userId)];
-  if (network === 'mainnet' || network === 'testnet') {
-    conditions.push(eq(airdropCampaigns.network, network));
+  if (network && !isSupportedNetwork(network)) {
+    json(ctx.res, 400, {
+      success: false,
+      error: { code: 'UNSUPPORTED_NETWORK', message: 'Only testnet is currently supported' },
+    });
+    return;
   }
+
+  const conditions = [
+    eq(airdropCampaigns.userId, ctx.user.userId),
+    eq(airdropCampaigns.network, SUPPORTED_NETWORK),
+  ];
 
   const rows = await db
     .select()
@@ -76,11 +90,19 @@ export async function createCampaign(ctx: RouteContext): Promise<void> {
     return;
   }
 
+  if (!isSupportedNetwork(body.network)) {
+    json(ctx.res, 400, {
+      success: false,
+      error: { code: 'UNSUPPORTED_NETWORK', message: 'Only testnet is currently supported' },
+    });
+    return;
+  }
+
   await db.insert(airdropCampaigns).values({
     id: body.id as string,
     userId: ctx.user.userId,
     name: body.name as string,
-    network: body.network as 'mainnet' | 'testnet',
+    network: SUPPORTED_NETWORK,
     tokenId: body.tokenId as string,
     tokenSymbol: (body.tokenSymbol as string) || null,
     tokenName: (body.tokenName as string) || null,
@@ -170,7 +192,12 @@ export async function listVestingCampaigns(ctx: RouteContext): Promise<void> {
   const rows = await db
     .select()
     .from(vestingCampaigns)
-    .where(eq(vestingCampaigns.userId, ctx.user.userId))
+    .where(
+      and(
+        eq(vestingCampaigns.userId, ctx.user.userId),
+        eq(vestingCampaigns.network, SUPPORTED_NETWORK),
+      ),
+    )
     .orderBy(desc(vestingCampaigns.updatedAt))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
@@ -213,11 +240,19 @@ export async function createVestingCampaign(ctx: RouteContext): Promise<void> {
     return;
   }
 
+  if (!isSupportedNetwork(body.network)) {
+    json(ctx.res, 400, {
+      success: false,
+      error: { code: 'UNSUPPORTED_NETWORK', message: 'Only testnet is currently supported' },
+    });
+    return;
+  }
+
   await db.insert(vestingCampaigns).values({
     id: body.id as string,
     userId: ctx.user.userId,
     name: body.name as string,
-    network: body.network as 'mainnet' | 'testnet',
+    network: SUPPORTED_NETWORK,
     tokenId: body.tokenId as string,
     template: body.template as 'CLIFF_ONLY' | 'MONTHLY_TRANCHES' | 'CUSTOM_TRANCHES',
     schedule: body.schedule as Record<string, unknown>,

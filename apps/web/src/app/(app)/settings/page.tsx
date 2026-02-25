@@ -128,12 +128,14 @@ export default function SettingsPage() {
                   Default network
                 </div>
                 <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Network to use when creating new campaigns
+                  Campaign network is fixed to testnet (Chipnet)
                 </div>
               </div>
-              <select className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              <select
+                disabled
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              >
                 <option value="testnet">Testnet (Chipnet)</option>
-                <option value="mainnet">Mainnet</option>
               </select>
             </div>
           </div>

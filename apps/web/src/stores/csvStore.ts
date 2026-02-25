@@ -95,7 +95,7 @@ const initialState = {
   mapping: null,
   mappingSuggestion: null,
 
-  network: 'mainnet' as Network,
+  network: 'testnet' as Network,
   decimals: 8,
   rounding: 'floor' as const,
   mergeDuplicates: false,

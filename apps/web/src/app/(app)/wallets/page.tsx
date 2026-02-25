@@ -37,8 +37,8 @@ export default function WalletsPage() {
   // Load wallets and network on mount
   useEffect(() => {
     loadWallets();
-    settingsRepo.get().then((settings) => {
-      setNetwork(settings.network);
+    settingsRepo.get().then(() => {
+      setNetwork('testnet');
     });
   }, [loadWallets]);
 

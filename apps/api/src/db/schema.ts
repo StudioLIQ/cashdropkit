@@ -252,7 +252,7 @@ export const tokenCache = pgTable(
 export const appSettings = pgTable('app_settings', {
   id: varchar('id', { length: 64 }).primaryKey(), // userId or 'default'
   userId: varchar('user_id', { length: 64 }).notNull(),
-  network: networkEnum('network').notNull().default('mainnet'),
+  network: networkEnum('network').notNull().default('testnet'),
   autoLockMinutes: integer('auto_lock_minutes').notNull().default(15),
   requirePasswordForSigning: boolean('require_password_for_signing').notNull().default(true),
   defaultFeeRateSatPerByte: integer('default_fee_rate_sat_per_byte').notNull().default(1),
