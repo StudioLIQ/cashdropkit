@@ -4,17 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "node --import tsx src/index.ts",
-    "start:worker": "node --import tsx src/worker/main.ts",
+    "dev": "../../scripts/with-root-env.sh tsx watch src/index.ts",
+    "start": "../../scripts/with-root-env.sh node --import tsx src/index.ts",
+    "start:worker": "../../scripts/with-root-env.sh node --import tsx src/worker/main.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "../../scripts/with-root-env.sh drizzle-kit generate",
+    "db:migrate": "../../scripts/with-root-env.sh tsx src/db/migrate.ts",
+    "db:seed": "../../scripts/with-root-env.sh tsx src/db/seed.ts",
+    "db:studio": "../../scripts/with-root-env.sh drizzle-kit studio"
   },
   "dependencies": {
     "@cashdropkit/shared": "workspace:*",

@@ -123,7 +123,7 @@ export function assertEnv(): void {
     for (const err of errors) {
       console.error(`  - ${err}`);
     }
-    console.error('\nSee apps/api/.env.example for required variables.');
+    console.error('\nSee .env.example (repo root) for required variables.');
     process.exit(1);
   }
 }

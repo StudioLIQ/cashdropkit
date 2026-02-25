@@ -50,8 +50,11 @@ pnpm install
 # Copy environment configuration
 cp .env.example .env.local
 
-# Start development server
+# Start web (terminal 1)
 pnpm dev
+
+# Start API (terminal 2)
+pnpm dev:api
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -137,18 +140,20 @@ src/
 
 ## Configuration
 
-Edit `.env.local` to configure:
+Manage all environment variables in root `.env.local`:
 
 ```bash
-# Network: "mainnet" or "testnet"
+# Web (testnet only)
+NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_DEFAULT_NETWORK=testnet
-
-# Electrum endpoints
-NEXT_PUBLIC_MAINNET_ELECTRUM_URL=wss://electrum.bitcoincash.network:50004
 NEXT_PUBLIC_TESTNET_ELECTRUM_URL=wss://chipnet.imaginary.cash:50004
-
-# Auto-lock timeout (minutes)
 NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
+
+# API (testnet only)
+DATABASE_URL=postgresql://user:password@localhost:5432/cashdropkit
+SESSION_SECRET=replace-with-random-64-char-hex
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+ELECTRUM_TESTNET_URL=wss://chipnet.imaginary.cash:50004
 ```
 
 ## Tech Stack

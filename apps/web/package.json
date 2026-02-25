@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
+    "dev": "../../scripts/with-root-env.sh next dev --turbopack",
+    "build": "../../scripts/with-root-env.sh next build",
+    "start": "../../scripts/with-root-env.sh next start",
     "lint": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
