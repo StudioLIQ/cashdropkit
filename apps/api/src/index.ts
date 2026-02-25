@@ -97,6 +97,8 @@ const server = createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`@cashdropkit/api listening on http://${HOST}:${PORT}`);
   console.log(`Health check: http://${HOST}:${PORT}/health`);
+  const authMode = process.env.API_ACCESS_TOKEN ? 'shared-token' : 'jwt';
+  console.log(`Auth mode: ${authMode}`);
 });
 
 // Graceful shutdown

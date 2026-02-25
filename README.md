@@ -145,6 +145,7 @@ Manage all environment variables in root `.env.local`:
 ```bash
 # Web (testnet only)
 NEXT_PUBLIC_API_URL=https://api.cashdropkit.com
+NEXT_PUBLIC_API_ACCESS_TOKEN=replace-with-shared-api-token
 NEXT_PUBLIC_DEFAULT_NETWORK=testnet
 NEXT_PUBLIC_TESTNET_ELECTRUM_URL=wss://chipnet.imaginary.cash:50004
 NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
@@ -153,8 +154,26 @@ NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
 DATABASE_URL=postgresql://user:password@localhost:5432/cashdropkit
 SESSION_SECRET=replace-with-random-64-char-hex
 CORS_ALLOWED_ORIGINS=https://cashdropkit.com,https://www.cashdropkit.com,http://localhost:3000
+API_ACCESS_TOKEN=replace-with-same-shared-api-token
 ELECTRUM_TESTNET_URL=wss://chipnet.imaginary.cash:50004
 ```
+
+For hosted mode, set the same token value in both `NEXT_PUBLIC_API_ACCESS_TOKEN` (Vercel) and `API_ACCESS_TOKEN` (Railway).  
+`SESSION_SECRET` is still supported for JWT auth, but not required when `API_ACCESS_TOKEN` is configured.
+
+Useful commands:
+
+```bash
+pnpm gen:session-secret
+pnpm gen:api-access-token
+```
+
+Production target values:
+
+- Web domains: `https://cashdropkit.com`, `https://www.cashdropkit.com`
+- API domain: `https://api.cashdropkit.com`
+- `CORS_ALLOWED_ORIGINS` must include both web domains
+- `NEXT_PUBLIC_API_URL` should be `https://api.cashdropkit.com`
 
 ## Tech Stack
 

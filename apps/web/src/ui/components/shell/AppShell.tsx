@@ -5,6 +5,7 @@ import { ReactNode, useCallback, useEffect } from 'react';
 import { setGlobalAdapter, useConnectionStore, useWalletStore } from '@/stores';
 
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
+import { initApiClient } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { ToastContainer } from '@/ui/components/toasts/ToastContainer';
@@ -14,6 +15,16 @@ import { Topbar } from './Topbar';
 
 interface AppShellProps {
   children: ReactNode;
+}
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').trim().replace(/\/+$/, '');
+const API_ACCESS_TOKEN = (process.env.NEXT_PUBLIC_API_ACCESS_TOKEN ?? '').trim();
+
+if (API_BASE_URL) {
+  initApiClient({
+    baseUrl: API_BASE_URL,
+    getToken: API_ACCESS_TOKEN ? () => API_ACCESS_TOKEN : undefined,
+  });
 }
 
 export function AppShell({ children }: AppShellProps) {

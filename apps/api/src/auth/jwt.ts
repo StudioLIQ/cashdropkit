@@ -100,6 +100,23 @@ export function authenticateRequest(authHeader: string | undefined, secret: stri
 }
 
 /**
+ * Authenticate using a static shared Bearer token.
+ * Useful for simple hosted deployments without per-user auth flow.
+ */
+export function authenticateAccessToken(
+  authHeader: string | undefined,
+  accessToken: string,
+): AuthUser | null {
+  if (!authHeader) return null;
+
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  if (match[1] !== accessToken) return null;
+
+  return { userId: 'api-access-token' };
+}
+
+/**
  * Get the JWT secret from environment, fail-fast if missing.
  */
 export function getJwtSecret(): string {

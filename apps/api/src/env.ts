@@ -8,8 +8,9 @@
 export interface EnvConfig {
   // Required
   DATABASE_URL: string;
-  SESSION_SECRET: string;
+  SESSION_SECRET?: string;
   CORS_ALLOWED_ORIGINS: string;
+  API_ACCESS_TOKEN?: string;
 
   // Required for chain operations
   ELECTRUM_TESTNET_URL: string;
@@ -38,12 +39,17 @@ const ENV_RULES: EnvRule[] = [
   },
   {
     key: 'SESSION_SECRET',
-    required: true,
+    required: false,
     minLength: 32,
   },
   {
     key: 'CORS_ALLOWED_ORIGINS',
     required: true,
+  },
+  {
+    key: 'API_ACCESS_TOKEN',
+    required: false,
+    minLength: 16,
   },
   {
     key: 'ELECTRUM_TESTNET_URL',
@@ -109,6 +115,12 @@ export function validateEnv(): string[] {
     }
   }
 
+  const hasSessionSecret = Boolean(process.env.SESSION_SECRET);
+  const hasAccessToken = Boolean(process.env.API_ACCESS_TOKEN);
+  if (!hasSessionSecret && !hasAccessToken) {
+    errors.push('AUTH: Set SESSION_SECRET (JWT) or API_ACCESS_TOKEN (shared token)');
+  }
+
   return errors;
 }
 
@@ -134,8 +146,9 @@ export function assertEnv(): void {
 export function getEnvConfig(): EnvConfig {
   return {
     DATABASE_URL: process.env.DATABASE_URL!,
-    SESSION_SECRET: process.env.SESSION_SECRET!,
+    SESSION_SECRET: process.env.SESSION_SECRET,
     CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS || '*',
+    API_ACCESS_TOKEN: process.env.API_ACCESS_TOKEN,
     ELECTRUM_TESTNET_URL: process.env.ELECTRUM_TESTNET_URL!,
     WORKER_POLL_INTERVAL_MS: parseInt(process.env.WORKER_POLL_INTERVAL_MS || '30000'),
     WORKER_DROPPED_THRESHOLD_MS: parseInt(process.env.WORKER_DROPPED_THRESHOLD_MS || '1800000'),

@@ -9,7 +9,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { AuthUser } from '../auth/index.js';
-import { authenticateRequest, getJwtSecret } from '../auth/index.js';
+import { authenticateAccessToken, authenticateRequest, getJwtSecret } from '../auth/index.js';
 import type { CorsConfig } from '../middleware/cors.js';
 import { applyCorsHeaders, handlePreflight, parseCorsConfig } from '../middleware/cors.js';
 import { filterSecrets } from '../middleware/secretFilter.js';
@@ -115,15 +115,27 @@ export class Router {
 
       // Auth check (skip for public paths)
       if (!this.publicPaths.has(pathname)) {
-        let secret: string;
-        try {
-          secret = getJwtSecret();
-        } catch {
-          json(res, 500, { error: { code: 'AUTH_CONFIG_ERROR', message: 'Server auth not configured' } });
-          return;
+        const staticAccessToken = process.env.API_ACCESS_TOKEN?.trim();
+        let user: AuthUser | null = null;
+
+        if (staticAccessToken) {
+          user = authenticateAccessToken(req.headers.authorization, staticAccessToken);
+        } else {
+          let secret: string;
+          try {
+            secret = getJwtSecret();
+          } catch {
+            json(res, 500, {
+              error: {
+                code: 'AUTH_CONFIG_ERROR',
+                message: 'Server auth not configured',
+              },
+            });
+            return;
+          }
+          user = authenticateRequest(req.headers.authorization, secret);
         }
 
-        const user = authenticateRequest(req.headers.authorization, secret);
         if (!user) {
           json(res, 401, { error: { code: 'UNAUTHORIZED', message: 'Valid Bearer token required' } });
           return;

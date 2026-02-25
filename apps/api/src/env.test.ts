@@ -45,7 +45,13 @@ describe('env validation', () => {
   it('detects missing SESSION_SECRET', () => {
     delete process.env.SESSION_SECRET;
     const errors = validateEnv();
-    expect(errors.some((e) => e.includes('SESSION_SECRET'))).toBe(true);
+    expect(errors.some((e) => e.includes('AUTH'))).toBe(true);
+  });
+
+  it('allows missing SESSION_SECRET when API_ACCESS_TOKEN is set', () => {
+    delete process.env.SESSION_SECRET;
+    process.env.API_ACCESS_TOKEN = 'shared-access-token-1234';
+    expect(validateEnv()).toEqual([]);
   });
 
   it('detects invalid ELECTRUM_TESTNET_URL', () => {
@@ -56,7 +62,14 @@ describe('env validation', () => {
 
   it('allows optional variables to be missing', () => {
     delete process.env.WORKER_POLL_INTERVAL_MS;
+    delete process.env.API_ACCESS_TOKEN;
     expect(validateEnv()).toEqual([]);
+  });
+
+  it('validates API_ACCESS_TOKEN minimum length when provided', () => {
+    process.env.API_ACCESS_TOKEN = 'short-token';
+    const errors = validateEnv();
+    expect(errors.some((e) => e.includes('API_ACCESS_TOKEN'))).toBe(true);
   });
 
   it('validates LOG_LEVEL values', () => {
