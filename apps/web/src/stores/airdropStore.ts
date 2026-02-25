@@ -649,9 +649,8 @@ export const useAirdropStore = create<AirdropState>((set, get) => ({
     set({ failedBatches });
   },
 
-  setExecutorConfig: () => {
-    // This is a placeholder for setting config externally
-    // The actual adapter is set via setGlobalAdapter
+  setExecutorConfig: (config: ExecutorConfig) => {
+    currentAdapter = config.adapter;
   },
 
   // Confirmation polling actions

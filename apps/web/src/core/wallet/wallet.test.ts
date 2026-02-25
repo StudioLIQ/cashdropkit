@@ -4,9 +4,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  deriveAddress,
+  deriveAddresses,
   decodeCashAddr,
   encodeCashAddr,
   generateMnemonic,
+  getDerivationPath,
   getPrefix,
   isValidCashAddr,
   normalizeCashAddr,
@@ -214,12 +217,42 @@ describe('Mnemonic', () => {
 });
 
 describe('Address Derivation', () => {
-  // Note: We need to mock or use actual derivation for these tests
-  // Skipping detailed derivation tests since they require async operations
-  // and would need a test mnemonic with known derived addresses
+  const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
-  it('placeholder for derivation tests', () => {
-    // This test ensures the module loads correctly
-    expect(true).toBe(true);
+  it('derives deterministic address for same mnemonic/path', async () => {
+    const a1 = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 0);
+    const a2 = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 0);
+    expect(a1).toBe(a2);
+    expect(a1).toMatch(/^bitcoincash:/);
+  });
+
+  it('derives different addresses for different index', async () => {
+    const a0 = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 0);
+    const a1 = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 1);
+    expect(a0).not.toBe(a1);
+  });
+
+  it('derives network-specific address prefixes', async () => {
+    const mainnetAddress = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 0);
+    const testnetAddress = await deriveAddress(TEST_MNEMONIC, 'testnet', 0, 0);
+    expect(mainnetAddress).toMatch(/^bitcoincash:/);
+    expect(testnetAddress).toMatch(/^bchtest:/);
+  });
+
+  it('derives multiple addresses with requested count', async () => {
+    const addresses = await deriveAddresses(TEST_MNEMONIC, 'testnet', {
+      accountIndex: 0,
+      addressCount: 3,
+    });
+    expect(addresses).toHaveLength(3);
+    expect(new Set(addresses).size).toBe(3);
+    addresses.forEach((addr) => {
+      expect(addr).toMatch(/^bchtest:/);
+    });
+  });
+
+  it('builds expected BIP44 derivation path', () => {
+    expect(getDerivationPath('mainnet', 0, 5)).toBe("m/44'/145'/0'/0/5");
+    expect(getDerivationPath('testnet', 1, 2)).toBe("m/44'/1'/1'/0/2");
   });
 });

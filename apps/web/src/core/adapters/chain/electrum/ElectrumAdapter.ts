@@ -362,7 +362,7 @@ export class ElectrumAdapter implements ChainAdapter {
 
       return {
         height: headerHex.height,
-        hash: this.doubleHash(headerHex.hex),
+        hash: await this.doubleHash(headerHex.hex),
         timestamp: header.timestamp,
       };
     });
@@ -376,7 +376,7 @@ export class ElectrumAdapter implements ChainAdapter {
         const headerHex = await this.client.request<string>('blockchain.block.header', [height]);
 
         const header = this.parseBlockHeader(headerHex);
-        const hash = this.doubleHash(headerHex);
+        const hash = await this.doubleHash(headerHex);
 
         return {
           height,
@@ -584,14 +584,18 @@ export class ElectrumAdapter implements ChainAdapter {
 
   /**
    * Double SHA256 hash (for block hash)
-   * Note: Returns empty string for now as this requires async crypto.
-   * Block hash is not critical for basic operations.
    */
-  private doubleHash(hex: string): string {
-    // TODO: Implement proper double SHA256 for block hash calculation
-    // For MVP, block hash is not used in critical paths
-    void hex; // Mark as intentionally unused
-    return '';
+  private async doubleHash(hex: string): Promise<string> {
+    if (hex.length % 2 !== 0) {
+      throw new Error('Invalid hex input length for doubleHash');
+    }
+
+    const inputBytes = this.hexToBytes(hex);
+    const firstHash = await crypto.subtle.digest('SHA-256', inputBytes as BufferSource);
+    const secondHash = await crypto.subtle.digest('SHA-256', firstHash);
+
+    // Bitcoin block hashes are displayed in little-endian hex.
+    return this.reverseHex(this.bytesToHex(new Uint8Array(secondHash)));
   }
 
   /**
@@ -600,6 +604,20 @@ export class ElectrumAdapter implements ChainAdapter {
   private reverseHex(hex: string): string {
     const bytes = hex.match(/.{2}/g) || [];
     return bytes.reverse().join('');
+  }
+
+  private hexToBytes(hex: string): Uint8Array {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return bytes;
+  }
+
+  private bytesToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   /**

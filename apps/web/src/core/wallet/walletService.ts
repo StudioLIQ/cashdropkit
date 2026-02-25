@@ -18,6 +18,7 @@ import {
   normalizeMnemonic,
   validateMnemonic,
 } from './mnemonic';
+import { isValidCashAddr, normalizeCashAddr } from './cashaddr';
 import { DEFAULT_DERIVATION, type UnlockedWallet } from './types';
 
 /**
@@ -161,7 +162,7 @@ export async function unlockWallet(wallet: Wallet, passphrase: string): Promise<
 }
 
 /**
- * Create a watch-only wallet (placeholder for MVP)
+ * Create a watch-only wallet
  *
  * @param name - Wallet display name
  * @param address - Watch address
@@ -173,16 +174,26 @@ export async function createWatchOnlyWallet(
   address: string,
   network: Network
 ): Promise<Wallet> {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error('Wallet name is required');
+  }
+
+  const normalizedAddress = normalizeCashAddr(address);
+  if (!isValidCashAddr(normalizedAddress, network)) {
+    throw new Error(`Invalid ${network} CashAddr`);
+  }
+
   const now = Date.now();
   const wallet: Wallet = {
     id: generateId(),
-    name,
+    name: trimmedName,
     createdAt: now,
     updatedAt: now,
     network,
     type: 'watch-only',
-    watchAddress: address,
-    addresses: [address],
+    watchAddress: normalizedAddress,
+    addresses: [normalizedAddress],
   };
 
   await walletRepo.create(wallet);
