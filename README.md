@@ -59,6 +59,12 @@ pnpm dev:api
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+Fast local mode (Web + API + Postgres with one command):
+
+```bash
+pnpm local:dev
+```
+
 ### Running Tests
 
 ```bash

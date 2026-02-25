@@ -15,6 +15,12 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @cashdropkit/web test",
     "test:watch": "pnpm --filter @cashdropkit/web test:watch",
+    "local:setup": "./scripts/local-setup.sh",
+    "local:db:up": "docker compose -f docker-compose.local.yml up -d postgres",
+    "local:db:down": "docker compose -f docker-compose.local.yml down",
+    "local:db:logs": "docker compose -f docker-compose.local.yml logs -f postgres",
+    "local:migrate": "pnpm --filter @cashdropkit/api db:migrate",
+    "local:dev": "./scripts/local-dev.sh",
     "gen:session-secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
     "gen:api-access-token": "node -e \"console.log(require('crypto').randomBytes(24).toString('base64url'))\""
   },

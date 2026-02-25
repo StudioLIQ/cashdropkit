@@ -17,7 +17,17 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-const API_BASE_URL = 'https://api.cashdropkit.com';
+function resolveApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+  }
+  return 'https://api.cashdropkit.com';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const API_ACCESS_TOKEN = 'cashdropkit-public-client-token';
 
 if (API_BASE_URL) {
