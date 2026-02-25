@@ -22,6 +22,23 @@ export {
   walletRepo,
 } from './repositories';
 
+// API Repository Adapters (hosted mode)
+export { apiAirdropRepo, apiLogRepo, apiVestingRepo } from './apiRepositories';
+
+// API Client
+export { ApiError, getApiBaseUrl, initApiClient, isApiAvailable } from './apiClient';
+
+// Repository Provider (selects Dexie or API based on env)
+export {
+  getAirdropRepo,
+  getLogRepo,
+  getRepositoryRegistry,
+  getSettingsRepo,
+  getTokenMetadataRepo,
+  getVestingRepo,
+  getWalletRepo,
+} from './repositoryProvider';
+
 // Types
 export type {
   AirdropCampaign,

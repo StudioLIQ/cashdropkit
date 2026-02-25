@@ -4,7 +4,7 @@
  * Business logic for airdrop campaign management.
  * Wraps the repository with validation and derived state calculations.
  */
-import { airdropRepo, settingsRepo } from '@/core/db';
+import { getAirdropRepo, getSettingsRepo } from '@/core/db';
 import type { AirdropCampaign, Network, RecipientRow, TokenRef } from '@/core/db/types';
 
 import type {
@@ -26,7 +26,7 @@ function generateId(): string {
  * Get default airdrop settings from app settings
  */
 async function getDefaultSettings(): Promise<AirdropCampaign['settings']> {
-  const appSettings = await settingsRepo.get();
+  const appSettings = await getSettingsRepo().get();
   return {
     feeRateSatPerByte: appSettings.defaultFeeRateSatPerByte,
     dustSatPerOutput: appSettings.defaultDustSatPerOutput,
@@ -227,7 +227,7 @@ export const airdropService = {
       notes: input.notes,
     };
 
-    await airdropRepo.create(campaign);
+    await getAirdropRepo().create(campaign);
     return campaign;
   },
 
@@ -235,28 +235,28 @@ export const airdropService = {
    * Get campaign by ID
    */
   async getById(id: string): Promise<AirdropCampaign | undefined> {
-    return airdropRepo.getById(id);
+    return getAirdropRepo().getById(id);
   },
 
   /**
    * Get all campaigns
    */
   async getAll(): Promise<AirdropCampaign[]> {
-    return airdropRepo.getAll();
+    return getAirdropRepo().getAll();
   },
 
   /**
    * Get campaigns by network
    */
   async getByNetwork(network: Network): Promise<AirdropCampaign[]> {
-    return airdropRepo.getByNetwork(network);
+    return getAirdropRepo().getByNetwork(network);
   },
 
   /**
    * Get all campaigns as summaries
    */
   async getAllSummaries(): Promise<CampaignSummary[]> {
-    const campaigns = await airdropRepo.getAll();
+    const campaigns = await getAirdropRepo().getAll();
     return campaigns.map(campaignToSummary);
   },
 
@@ -264,7 +264,7 @@ export const airdropService = {
    * Get summaries by network
    */
   async getSummariesByNetwork(network: Network): Promise<CampaignSummary[]> {
-    const campaigns = await airdropRepo.getByNetwork(network);
+    const campaigns = await getAirdropRepo().getByNetwork(network);
     return campaigns.map(campaignToSummary);
   },
 
@@ -273,70 +273,70 @@ export const airdropService = {
    */
   async update(campaign: AirdropCampaign): Promise<void> {
     campaign.updatedAt = Date.now();
-    await airdropRepo.update(campaign);
+    await getAirdropRepo().update(campaign);
   },
 
   /**
    * Patch campaign with partial updates
    */
   async patch(id: string, updates: Partial<AirdropCampaign>): Promise<void> {
-    await airdropRepo.patch(id, updates);
+    await getAirdropRepo().patch(id, updates);
   },
 
   /**
    * Delete campaign
    */
   async delete(id: string): Promise<void> {
-    await airdropRepo.delete(id);
+    await getAirdropRepo().delete(id);
   },
 
   /**
    * Update campaign name
    */
   async updateName(id: string, name: string): Promise<void> {
-    await airdropRepo.patch(id, { name: name.trim() });
+    await getAirdropRepo().patch(id, { name: name.trim() });
   },
 
   /**
    * Update campaign token
    */
   async updateToken(id: string, token: TokenRef): Promise<void> {
-    await airdropRepo.patch(id, { token });
+    await getAirdropRepo().patch(id, { token });
   },
 
   /**
    * Update campaign recipients
    */
   async updateRecipients(id: string, recipients: RecipientRow[]): Promise<void> {
-    await airdropRepo.patch(id, { recipients });
+    await getAirdropRepo().patch(id, { recipients });
   },
 
   /**
    * Update campaign settings
    */
   async updateSettings(id: string, settings: AirdropCampaign['settings']): Promise<void> {
-    await airdropRepo.patch(id, { settings });
+    await getAirdropRepo().patch(id, { settings });
   },
 
   /**
    * Update campaign funding
    */
   async updateFunding(id: string, funding: AirdropCampaign['funding']): Promise<void> {
-    await airdropRepo.patch(id, { funding });
+    await getAirdropRepo().patch(id, { funding });
   },
 
   /**
    * Update campaign plan
    */
   async updatePlan(id: string, plan: AirdropCampaign['plan']): Promise<void> {
-    await airdropRepo.patch(id, { plan });
+    await getAirdropRepo().patch(id, { plan });
   },
 
   /**
    * Clear campaign plan
    */
   async clearPlan(id: string): Promise<void> {
-    await airdropRepo.patch(id, { plan: undefined });
+    await getAirdropRepo().patch(id, { plan: undefined });
   },
 
   /**
