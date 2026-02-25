@@ -8,6 +8,7 @@
 
 import { createServer } from 'node:http';
 
+import { assertEnv, getEnvConfig } from './env.js';
 import {
   createCampaign,
   createVestingCampaign,
@@ -20,8 +21,15 @@ import {
 } from './routes/campaigns.js';
 import { Router, json } from './routes/router.js';
 
-const PORT = parseInt(process.env.PORT || '3001', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+// ============================================================================
+// Fail-fast env validation — process exits immediately on missing vars
+// ============================================================================
+
+assertEnv();
+
+const envConfig = getEnvConfig();
+const PORT = envConfig.PORT;
+const HOST = envConfig.HOST;
 
 // ============================================================================
 // Router Setup
