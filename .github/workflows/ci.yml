@@ -71,3 +71,135 @@ jobs:
         run: pnpm --filter @cashdropkit/web build
       - name: Build api (TypeScript)
         run: pnpm --filter @cashdropkit/api build
+
+  # ===========================================================================
+  # Deploy Pipeline — runs only on push to main (not PRs)
+  # ===========================================================================
+
+  migrate:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @cashdropkit/api db:migrate
+      - name: Verify migration success
+        run: echo "Migration completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-api:
+    name: Deploy API (Railway)
+    runs-on: ubuntu-latest
+    needs: [migrate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+      - name: Deploy API service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service api --detach
+      - name: Verify API health
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          echo "Waiting for API to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf "${API_URL}/health" > /dev/null 2>&1; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: API health check failed after 5 minutes"
+          exit 1
+
+  deploy-worker:
+    name: Deploy Worker (Railway)
+    runs-on: ubuntu-latest
+    needs: [migrate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+      - name: Deploy Worker service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service worker --detach
+      - name: Log deployment
+        run: echo "Worker deployed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  deploy-web:
+    name: Deploy Web (Vercel)
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Pull Vercel environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+      - name: Build for production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token=$VERCEL_TOKEN
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+  # ===========================================================================
+  # Post-deploy notification
+  # ===========================================================================
+
+  notify:
+    name: Deploy Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-api, deploy-worker, deploy-web]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Summary
+        run: |
+          echo "## Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Worker | ${{ needs.deploy-worker.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ${{ needs.deploy-web.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "Ref: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rollback:** See [deployment-runbook.md](docs/deployment-runbook.md)" >> $GITHUB_STEP_SUMMARY
+      - name: Fail if any deploy failed
+        if: |
+          needs.deploy-api.result == 'failure' ||
+          needs.deploy-worker.result == 'failure' ||
+          needs.deploy-web.result == 'failure'
+        run: |
+          echo "One or more deploy jobs failed. See deployment-runbook.md for rollback procedures."
+          exit 1
