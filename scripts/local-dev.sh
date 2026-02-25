@@ -75,7 +75,7 @@ echo "[local-dev] Running DB migration..."
 pnpm --filter @cashdropkit/api db:migrate
 
 echo "[local-dev] Starting API on http://localhost:3001 ..."
-pnpm --filter @cashdropkit/api dev &
+PORT=3001 pnpm --filter @cashdropkit/api dev &
 API_PID=$!
 
 cleanup() {
@@ -87,4 +87,4 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 echo "[local-dev] Starting Web on http://localhost:3000 ..."
-pnpm --filter @cashdropkit/web dev
+PORT=3000 pnpm --filter @cashdropkit/web dev

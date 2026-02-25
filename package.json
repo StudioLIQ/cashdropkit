@@ -21,6 +21,7 @@
     "local:db:logs": "docker compose -f docker-compose.local.yml logs -f postgres",
     "local:migrate": "pnpm --filter @cashdropkit/api db:migrate",
     "local:dev": "./scripts/local-dev.sh",
+    "scenario:prod": "./scripts/scenario-prod-smoke.sh",
     "gen:session-secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
     "gen:api-access-token": "node -e \"console.log(require('crypto').randomBytes(24).toString('base64url'))\""
   },

@@ -27,6 +27,17 @@ set_key() {
   fi
 }
 
+unset_key() {
+  key="$1"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    awk -v k="$key" '
+      BEGIN { FS = OFS = "=" }
+      $1 != k { print }
+    ' "$ENV_FILE" > "$ENV_FILE.tmp"
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+  fi
+}
+
 detect_existing_postgres_container_on_5432() {
   docker ps --format '{{.Names}}|{{.Image}}|{{.Ports}}' 2>/dev/null \
     | awk -F'|' '
@@ -69,6 +80,10 @@ set_key "NEXT_PUBLIC_DEFAULT_NETWORK" "testnet"
 set_key "NEXT_PUBLIC_TESTNET_ELECTRUM_URL" "wss://chipnet.imaginary.cash:50004"
 set_key "NEXT_PUBLIC_TESTNET_EXPLORER_URL" "https://chipnet.imaginary.cash"
 set_key "NEXT_PUBLIC_AUTO_LOCK_MINUTES" "15"
+
+# Prevent Next.js dev server from accidentally binding API port.
+# API defaults to 3001 without needing PORT in env.
+unset_key "PORT"
 
 printf '\n[local-setup] .env.local is ready.\n'
 printf '[local-setup] DATABASE_URL=%s\n' "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE" | head -n1)"

@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   title: 'CashDrop Kit',
   description:
     'Local-first web console for CashTokens airdrops and vesting with local signing, chunked execution, pause/resume, and auditable reporting.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' },
+    ],
+    shortcut: ['/favicon.svg'],
+    apple: [{ url: '/favicon.svg' }],
+  },
 };
 
 export default function RootLayout({
