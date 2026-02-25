@@ -50,3 +50,7 @@ next-env.d.ts
 TICKET.md
 DONE_TICKET.md
 LOCAL.md
+
+# keep only public README in git; keep all other docs local
+*.md
+!/README.md
