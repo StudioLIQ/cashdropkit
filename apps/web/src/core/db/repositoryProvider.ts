@@ -8,7 +8,8 @@
  * Wallet, Settings, and TokenMetadata always use Dexie (browser-only).
  * Encrypted mnemonics/keys NEVER leave the browser.
  */
-
+import { isApiAvailable } from './apiClient';
+import { apiAirdropRepo, apiLogRepo, apiVestingRepo } from './apiRepositories';
 import type {
   AirdropRepository,
   LogRepository,
@@ -18,9 +19,6 @@ import type {
   VestingRepository,
   WalletRepository,
 } from './ports';
-
-import { isApiAvailable } from './apiClient';
-import { apiAirdropRepo, apiLogRepo, apiVestingRepo } from './apiRepositories';
 import {
   airdropRepo as dexieAirdropRepo,
   logRepo as dexieLogRepo,

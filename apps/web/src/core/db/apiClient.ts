@@ -15,7 +15,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
-    public readonly details?: unknown,
+    public readonly details?: unknown
   ) {
     super(message);
     this.name = 'ApiError';
@@ -45,11 +45,7 @@ export function getApiBaseUrl(): string {
   return _config?.baseUrl ?? '';
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (!_config) {
     throw new ApiError(0, 'API_NOT_CONFIGURED', 'API client not initialized');
   }
@@ -83,7 +79,7 @@ async function request<T>(
       res.status,
       err.code ?? 'UNKNOWN',
       err.message ?? `HTTP ${res.status}`,
-      err.details,
+      err.details
     );
   }
 

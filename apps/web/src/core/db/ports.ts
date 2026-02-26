@@ -4,7 +4,6 @@
  * Domain logic depends only on these interfaces, not on Dexie or Postgres directly.
  * Implementations: DexieAdapter (browser), ApiAdapter (hosted), PostgresAdapter (server).
  */
-
 import type {
   AirdropCampaign,
   AppSettings,
@@ -69,7 +68,7 @@ export interface LogRepository {
     message: string,
     data?: Record<string, unknown>,
     campaignId?: string,
-    batchId?: string,
+    batchId?: string
   ): Promise<number>;
   getRecent(limit?: number): Promise<LogEntry[]>;
   getByCampaign(campaignId: string, limit?: number): Promise<LogEntry[]>;
@@ -98,7 +97,7 @@ export interface TokenMetadataRepository {
     tokenId: string,
     network: Network,
     metadata: Omit<TokenMetadataCache, 'id' | 'tokenId' | 'network' | 'fetchedAt' | 'expiresAt'>,
-    ttlMs?: number,
+    ttlMs?: number
   ): Promise<void>;
   delete(tokenId: string, network: Network): Promise<void>;
   getAllByNetwork(network: Network): Promise<TokenMetadataCache[]>;

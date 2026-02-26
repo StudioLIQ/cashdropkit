@@ -4,9 +4,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decodeCashAddr,
   deriveAddress,
   deriveAddresses,
-  decodeCashAddr,
   encodeCashAddr,
   generateMnemonic,
   getDerivationPath,
@@ -217,7 +217,8 @@ describe('Mnemonic', () => {
 });
 
 describe('Address Derivation', () => {
-  const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+  const TEST_MNEMONIC =
+    'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
   it('derives deterministic address for same mnemonic/path', async () => {
     const a1 = await deriveAddress(TEST_MNEMONIC, 'mainnet', 0, 0);

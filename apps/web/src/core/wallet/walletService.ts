@@ -11,6 +11,7 @@ import type { EncryptedData } from '../crypto';
 import { decryptWithPassphrase, encryptWithPassphrase, serializeEncrypted } from '../crypto';
 import { settingsRepo, walletRepo } from '../db';
 import type { Network, Wallet } from '../db/types';
+import { isValidCashAddr, normalizeCashAddr } from './cashaddr';
 import {
   deriveAddresses,
   generateMnemonic,
@@ -18,7 +19,6 @@ import {
   normalizeMnemonic,
   validateMnemonic,
 } from './mnemonic';
-import { isValidCashAddr, normalizeCashAddr } from './cashaddr';
 import { DEFAULT_DERIVATION, type UnlockedWallet } from './types';
 
 /**

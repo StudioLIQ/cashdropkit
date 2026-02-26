@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+import Image from 'next/image';
 
 import type { Network, TokenRef } from '@/core/db/types';
 import { type TokenLookupResult, getTokenService, isValidTokenCategory } from '@/core/token';
@@ -9,6 +11,10 @@ interface TokenLookupCardProps {
   network: Network;
   onTokenSelected?: (token: TokenRef) => void;
   initialTokenId?: string;
+}
+
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
 }
 
 function truncateTokenId(tokenId: string): string {
@@ -29,6 +35,11 @@ export function TokenLookupCard({
   // Manual decimals state
   const [manualDecimals, setManualDecimals] = useState<string>('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const [iconFailed, setIconFailed] = useState(false);
+
+  useEffect(() => {
+    setIconFailed(false);
+  }, [lookupResult?.token.tokenId, lookupResult?.token.iconUrl]);
 
   const handleLookup = useCallback(async () => {
     const trimmed = tokenId.trim();
@@ -125,6 +136,10 @@ export function TokenLookupCard({
     lookupResult?.success &&
     !lookupResult.requiresManualDecimals &&
     lookupResult.token.decimals !== undefined;
+  const showTokenIcon =
+    Boolean(lookupResult?.token.iconUrl) &&
+    isHttpUrl(lookupResult?.token.iconUrl ?? '') &&
+    !iconFailed;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
@@ -188,14 +203,15 @@ export function TokenLookupCard({
           <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-3 dark:bg-zinc-900 dark:border-zinc-800">
             <div className="flex items-start gap-3">
               {/* Icon */}
-              {lookupResult.token.iconUrl ? (
-                <img
-                  src={lookupResult.token.iconUrl}
+              {showTokenIcon ? (
+                <Image
+                  src={lookupResult.token.iconUrl ?? ''}
                   alt={lookupResult.token.symbol ?? 'Token'}
+                  width={40}
+                  height={40}
+                  unoptimized
                   className="h-10 w-10 rounded-full"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+                  onError={() => setIconFailed(true)}
                 />
               ) : (
                 <div className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">

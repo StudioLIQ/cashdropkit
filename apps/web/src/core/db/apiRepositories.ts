@@ -8,16 +8,8 @@
  * wallets with encrypted mnemonics MUST stay browser-only (LocalVault).
  * TokenMetadata and Settings also remain local-only for now.
  */
-
-import type {
-  AirdropCampaign,
-  LogEntry,
-  LogLevel,
-  Network,
-  VestingCampaign,
-} from './types';
-
 import { apiClient } from './apiClient';
+import type { AirdropCampaign, LogEntry, LogLevel, Network, VestingCampaign } from './types';
 
 // ============================================================================
 // Types for API responses
@@ -82,19 +74,27 @@ export const apiAirdropRepo = {
       const res = await apiClient.get<ApiResponse<ApiRow>>(`/api/v1/campaigns/${id}`);
       return res.data ? mapApiCampaignToLocal(res.data) : undefined;
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 404) return undefined;
+      if (
+        err &&
+        typeof err === 'object' &&
+        'status' in err &&
+        (err as { status: number }).status === 404
+      )
+        return undefined;
       throw err;
     }
   },
 
   async getAll(): Promise<AirdropCampaign[]> {
-    const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>('/api/v1/campaigns?pageSize=100');
+    const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>(
+      '/api/v1/campaigns?pageSize=100'
+    );
     return (res.data?.items ?? []).map(mapApiCampaignToLocal);
   },
 
   async getByNetwork(network: Network): Promise<AirdropCampaign[]> {
     const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>(
-      `/api/v1/campaigns?network=${network}&pageSize=100`,
+      `/api/v1/campaigns?network=${network}&pageSize=100`
     );
     return (res.data?.items ?? []).map(mapApiCampaignToLocal);
   },
@@ -168,19 +168,27 @@ export const apiVestingRepo = {
       const res = await apiClient.get<ApiResponse<ApiRow>>(`/api/v1/vesting/${id}`);
       return res.data ? mapApiVestingToLocal(res.data) : undefined;
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 404) return undefined;
+      if (
+        err &&
+        typeof err === 'object' &&
+        'status' in err &&
+        (err as { status: number }).status === 404
+      )
+        return undefined;
       throw err;
     }
   },
 
   async getAll(): Promise<VestingCampaign[]> {
-    const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>('/api/v1/vesting?pageSize=100');
+    const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>(
+      '/api/v1/vesting?pageSize=100'
+    );
     return (res.data?.items ?? []).map(mapApiVestingToLocal);
   },
 
   async getByNetwork(network: Network): Promise<VestingCampaign[]> {
     const res = await apiClient.get<ApiResponse<PaginatedData<ApiRow>>>(
-      `/api/v1/vesting?network=${network}&pageSize=100`,
+      `/api/v1/vesting?network=${network}&pageSize=100`
     );
     return (res.data?.items ?? []).map(mapApiVestingToLocal);
   },
@@ -217,25 +225,33 @@ export const apiLogRepo = {
     message: string,
     data?: Record<string, unknown>,
     _campaignId?: string,
-    _batchId?: string,
+    _batchId?: string
   ): Promise<number> {
+    void _campaignId;
+    void _batchId;
     console.log(`[${level}][${category}] ${message}`, data || '');
     return 0;
   },
 
   async getRecent(_limit?: number): Promise<LogEntry[]> {
+    void _limit;
     return [];
   },
 
   async getByCampaign(_campaignId: string, _limit?: number): Promise<LogEntry[]> {
+    void _campaignId;
+    void _limit;
     return [];
   },
 
   async getByLevel(_level: LogLevel, _limit?: number): Promise<LogEntry[]> {
+    void _level;
+    void _limit;
     return [];
   },
 
   async clearOlderThan(_timestamp: number): Promise<number> {
+    void _timestamp;
     return 0;
   },
 
@@ -269,22 +285,30 @@ function mapApiCampaignToLocal(raw: Record<string, unknown>): AirdropCampaign {
       iconUrl: (raw.tokenIconUrl ?? raw.token_icon_url) as string | undefined,
       verified: (raw.tokenVerified ?? raw.token_verified ?? false) as boolean,
     },
-    mode: ((raw.mode ?? raw.campaign_mode ?? 'FT') as string) as 'FT' | 'NFT',
-    amountUnit: ((raw.amountUnit ?? raw.amount_unit ?? 'base') as string) as 'base' | 'display',
+    mode: (raw.mode ?? raw.campaign_mode ?? 'FT') as string as 'FT' | 'NFT',
+    amountUnit: (raw.amountUnit ?? raw.amount_unit ?? 'base') as string as 'base' | 'display',
     recipients: (raw.recipients as AirdropCampaign['recipients']) ?? [],
     settings: {
       feeRateSatPerByte: asNumber(raw.feeRateSatPerByte ?? raw.fee_rate_sat_per_byte, 1),
       dustSatPerOutput: asNumber(raw.dustSatPerOutput ?? raw.dust_sat_per_output, 546),
       maxOutputsPerTx: asNumber(raw.maxOutputsPerTx ?? raw.max_outputs_per_tx, 80),
       maxInputsPerTx: asNumber(raw.maxInputsPerTx ?? raw.max_inputs_per_tx, 50),
-      allowMergeDuplicates: Boolean(raw.allowMergeDuplicates ?? raw.allow_merge_duplicates ?? false),
-      rounding: ((raw.rounding ?? 'floor') as string) as 'floor' | 'round' | 'ceil',
+      allowMergeDuplicates: Boolean(
+        raw.allowMergeDuplicates ?? raw.allow_merge_duplicates ?? false
+      ),
+      rounding: (raw.rounding ?? 'floor') as string as 'floor' | 'round' | 'ceil',
     },
     funding: {
-      sourceWalletId: ((raw.sourceWalletId ?? raw.source_wallet_id ?? '') as string),
-      tokenUtxoSelection: ((raw.tokenUtxoSelection ?? raw.token_utxo_selection ?? 'auto') as string) as 'auto' | 'manual',
-      bchUtxoSelection: ((raw.bchUtxoSelection ?? raw.bch_utxo_selection ?? 'auto') as string) as 'auto' | 'manual',
-      selectedTokenUtxos: (raw.selectedTokenUtxos ?? raw.selected_token_utxos) as string[] | undefined,
+      sourceWalletId: (raw.sourceWalletId ?? raw.source_wallet_id ?? '') as string,
+      tokenUtxoSelection: (raw.tokenUtxoSelection ??
+        raw.token_utxo_selection ??
+        'auto') as string as 'auto' | 'manual',
+      bchUtxoSelection: (raw.bchUtxoSelection ?? raw.bch_utxo_selection ?? 'auto') as string as
+        | 'auto'
+        | 'manual',
+      selectedTokenUtxos: (raw.selectedTokenUtxos ?? raw.selected_token_utxos) as
+        | string[]
+        | undefined,
       selectedBchUtxos: (raw.selectedBchUtxos ?? raw.selected_bch_utxos) as string[] | undefined,
     },
     plan: (raw.plan as AirdropCampaign['plan']) ?? undefined,
@@ -309,8 +333,11 @@ function mapApiVestingToLocal(raw: Record<string, unknown>): VestingCampaign {
       iconUrl: (raw.tokenIconUrl ?? raw.token_icon_url) as string | undefined,
       verified: (raw.tokenVerified ?? raw.token_verified ?? false) as boolean,
     },
-    template: ((raw.template ?? 'CLIFF_ONLY') as string) as VestingCampaign['template'],
-    schedule: (raw.schedule as VestingCampaign['schedule']) ?? { unlockTimes: [], amountsBasePerTranche: [] },
+    template: (raw.template ?? 'CLIFF_ONLY') as string as VestingCampaign['template'],
+    schedule: (raw.schedule as VestingCampaign['schedule']) ?? {
+      unlockTimes: [],
+      amountsBasePerTranche: [],
+    },
     beneficiaries: (raw.beneficiaries as VestingCampaign['beneficiaries']) ?? [],
     settings: {
       feeRateSatPerByte: asNumber(raw.feeRateSatPerByte ?? raw.fee_rate_sat_per_byte, 1),
@@ -318,7 +345,7 @@ function mapApiVestingToLocal(raw: Record<string, unknown>): VestingCampaign {
       lockScriptType: 'P2SH_CLTV_P2PKH',
     },
     funding: {
-      sourceWalletId: ((raw.sourceWalletId ?? raw.source_wallet_id ?? '') as string),
+      sourceWalletId: (raw.sourceWalletId ?? raw.source_wallet_id ?? '') as string,
     },
     plan: (raw.plan as VestingCampaign['plan']) ?? undefined,
     execution: (raw.execution as VestingCampaign['execution']) ?? undefined,

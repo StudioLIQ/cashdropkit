@@ -55,8 +55,8 @@ export class ConnectionService {
   private listeners: Set<ConnectionEventListener> = new Set();
   private isRunning = false;
 
-  private resolveSupportedNetwork(_network: Network): Network {
-    return 'testnet';
+  private resolveSupportedNetwork(network: Network): Network {
+    return network === 'testnet' ? network : 'testnet';
   }
 
   constructor(config: Partial<ConnectionServiceConfig> = {}) {

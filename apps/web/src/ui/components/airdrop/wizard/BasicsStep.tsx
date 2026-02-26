@@ -5,8 +5,7 @@ import { useCallback, useState } from 'react';
 import { useAirdropStore } from '@/stores';
 
 export function BasicsStep() {
-  const { activeCampaign, updateCampaignName, updateCampaignSettings, isSaving } =
-    useAirdropStore();
+  const { activeCampaign, updateCampaignName, isSaving } = useAirdropStore();
 
   const [name, setName] = useState(activeCampaign?.name || '');
   const [notes, setNotes] = useState(activeCampaign?.notes || '');
