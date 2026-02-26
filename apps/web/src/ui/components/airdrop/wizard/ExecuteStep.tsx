@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAirdropStore, useWalletStore } from '@/stores';
+import { useSignTransaction, useWallet } from 'bch-connect';
 
 import type { BatchPlan } from '@/core/db/types';
 import type { AddressDerivation } from '@/core/signer';
-import { createLocalMnemonicSigner } from '@/core/signer';
-import { unlockWallet } from '@/core/wallet';
+import { createWalletConnectSigner } from '@/core/signer';
 
 import { BatchDetailModal } from './BatchDetailModal';
 
@@ -42,13 +42,18 @@ export function ExecuteStep() {
     clearError,
   } = useAirdropStore();
   const { wallets, activeWalletId } = useWalletStore();
+  const { signTransaction } = useSignTransaction();
+  const {
+    address: connectedAddress,
+    isConnected: isExtensionConnected,
+    connect: connectExtensionWallet,
+    connectError,
+  } = useWallet();
 
   // Local UI state
-  const [passphrase, setPassphrase] = useState('');
-  const [showPassphraseModal, setShowPassphraseModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'start' | 'resume' | 'retry' | null>(null);
   const [forceRebuild, setForceRebuild] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isConnectingExtension, setIsConnectingExtension] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<{ batch: BatchPlan; index: number } | null>(
     null
   );
@@ -105,43 +110,51 @@ export function ExecuteStep() {
     refreshFailedBatches();
   }, [execution?.state, refreshFailedBatches]);
 
-  // Execute with signer
-  const executeWithSigner = useCallback(async () => {
-    if (!activeWallet || !pendingAction) return;
-
-    setLocalError(null);
-    setShowPassphraseModal(false);
-
-    try {
-      // Unlock wallet to get mnemonic
-      const unlocked = await unlockWallet(activeWallet, passphrase);
-      if (!unlocked) {
-        setLocalError('Failed to unlock wallet. Check your passphrase.');
+  // Execute with extension signer
+  const executeWithSigner = useCallback(
+    async (action: 'start' | 'resume' | 'retry') => {
+      if (!activeWallet) {
+        setLocalError('No active wallet selected');
         return;
       }
 
-      const network = activeCampaign?.network ?? 'testnet';
+      setLocalError(null);
 
-      // Create signer
-      const signer = createLocalMnemonicSigner(unlocked.mnemonic, network);
+      try {
+        if (!isExtensionConnected) {
+          setIsConnectingExtension(true);
+          await connectExtensionWallet();
+        }
+      } catch (err) {
+        setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
+        return;
+      } finally {
+        setIsConnectingExtension(false);
+      }
 
-      // Get derived addresses for signing
-      const addresses = activeWallet.addresses || [];
-      const addressDerivations: AddressDerivation[] = addresses.map((addr, index) => ({
-        address: addr,
-        accountIndex: 0,
-        addressIndex: index,
-      }));
+      const sourceAddress = activeWallet.addresses?.[0] || activeWallet.watchAddress || '';
+      if (!sourceAddress) {
+        setLocalError('Selected wallet has no source address');
+        return;
+      }
+
+      if (connectedAddress && sourceAddress !== connectedAddress) {
+        setLocalError('Active wallet address and connected extension address do not match');
+        return;
+      }
+
+      const signer = createWalletConnectSigner(signTransaction);
+      const addressDerivations: AddressDerivation[] = [];
 
       const config = {
         signer,
-        sourceAddress: addresses[0] || '',
+        sourceAddress,
         addressDerivations,
         batchDelayMs: 1000,
       };
 
       let result;
-      switch (pendingAction) {
+      switch (action) {
         case 'start':
           result = await startExecution(config);
           break;
@@ -153,44 +166,36 @@ export function ExecuteStep() {
           break;
       }
 
-      // Destroy signer after use
       signer.destroy();
 
       if (result && !result.success) {
         setLocalError(result.error || 'Execution failed');
       }
+    },
+    [
+      activeWallet,
+      connectedAddress,
+      isExtensionConnected,
+      connectExtensionWallet,
+      signTransaction,
+      forceRebuild,
+      startExecution,
+      resumeExecution,
+      retryFailedBatches,
+    ]
+  );
+
+  const handleConnectOnly = useCallback(async () => {
+    setLocalError(null);
+    try {
+      setIsConnectingExtension(true);
+      await connectExtensionWallet();
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to execute');
+      setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
-      setPassphrase('');
-      setPendingAction(null);
+      setIsConnectingExtension(false);
     }
-  }, [
-    activeWallet,
-    pendingAction,
-    passphrase,
-    activeCampaign?.network,
-    forceRebuild,
-    startExecution,
-    resumeExecution,
-    retryFailedBatches,
-  ]);
-
-  // Handle action with passphrase
-  const handleActionWithPassphrase = (action: 'start' | 'resume' | 'retry') => {
-    if (!activeWallet) {
-      setLocalError('No active wallet selected');
-      return;
-    }
-
-    if (activeWallet.type === 'watch-only') {
-      setLocalError('Cannot sign transactions with a watch-only wallet');
-      return;
-    }
-
-    setPendingAction(action);
-    setShowPassphraseModal(true);
-  };
+  }, [connectExtensionWallet]);
 
   if (!activeCampaign) return null;
 
@@ -252,7 +257,7 @@ export function ExecuteStep() {
       </div>
 
       {/* Error display */}
-      {(error || localError) && (
+      {(error || localError || connectError) && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
           <div className="flex items-start gap-3">
             <svg
@@ -269,7 +274,9 @@ export function ExecuteStep() {
               />
             </svg>
             <div className="flex-1">
-              <p className="text-sm text-red-700 dark:text-red-300">{error || localError}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">
+                {error || localError || connectError?.message}
+              </p>
             </div>
             <button
               onClick={() => {
@@ -386,12 +393,37 @@ export function ExecuteStep() {
         )}
       </div>
 
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+        <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+          Extension wallet signing is required
+        </p>
+        <p className="mt-1 text-xs text-blue-700 dark:text-blue-400">
+          CashDrop now signs via connected BCH wallet extension (WalletConnect). Recovery phrase
+          input is not used here.
+        </p>
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleConnectOnly}
+            disabled={isExtensionConnected || isConnectingExtension}
+            className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-900/30"
+          >
+            {isConnectingExtension ? 'Connecting...' : 'Connect Extension'}
+          </button>
+          <span className="text-xs text-blue-700 dark:text-blue-400">
+            {isExtensionConnected
+              ? `Connected: ${(connectedAddress || '').slice(0, 16)}...`
+              : 'Not connected'}
+          </span>
+        </div>
+      </div>
+
       {/* Control buttons */}
       <div className="flex flex-wrap gap-3">
         {canStart && (
           <button
             type="button"
-            onClick={() => handleActionWithPassphrase('start')}
+            onClick={() => executeWithSigner('start')}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -409,7 +441,7 @@ export function ExecuteStep() {
         {canResume && (
           <button
             type="button"
-            onClick={() => handleActionWithPassphrase('resume')}
+            onClick={() => executeWithSigner('resume')}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -578,7 +610,7 @@ export function ExecuteStep() {
               {canRetry && (
                 <button
                   type="button"
-                  onClick={() => handleActionWithPassphrase('retry')}
+                  onClick={() => executeWithSigner('retry')}
                   className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -632,54 +664,6 @@ export function ExecuteStep() {
           batchIndex={selectedBatch.index}
           onClose={() => setSelectedBatch(null)}
         />
-      )}
-
-      {/* Passphrase modal */}
-      {showPassphraseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Enter Passphrase
-            </h3>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Enter your wallet passphrase to sign transactions.
-            </p>
-            <input
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              placeholder="Passphrase"
-              className="mt-4 w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && passphrase) {
-                  executeWithSigner();
-                }
-              }}
-            />
-            <div className="mt-4 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPassphraseModal(false);
-                  setPassphrase('');
-                  setPendingAction(null);
-                }}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={executeWithSigner}
-                disabled={!passphrase}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                Unlock &amp; Execute
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

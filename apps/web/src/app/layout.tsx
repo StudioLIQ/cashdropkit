@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, Manrope, Space_Grotesk } from 'next/font/google';
 
+import { ExtensionWalletProvider } from '@/ui/providers/ExtensionWalletProvider';
+
 import './globals.css';
 
 const manrope = Manrope({
@@ -21,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'CashDrop Kit',
   description:
-    'Local-first web console for CashTokens airdrops and vesting with local signing, chunked execution, pause/resume, and auditable reporting.',
+    'Local-first web console for CashTokens airdrops and vesting with extension-wallet signing, chunked execution, pause/resume, and auditable reporting.',
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -49,7 +51,7 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        {children}
+        <ExtensionWalletProvider>{children}</ExtensionWalletProvider>
       </body>
     </html>
   );

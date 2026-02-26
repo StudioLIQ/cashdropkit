@@ -18,3 +18,4 @@ export type {
 export { SIGHASH, DEFAULT_SIGHASH_TYPE } from './Signer';
 
 export { LocalMnemonicSigner, createLocalMnemonicSigner } from './LocalMnemonicSigner';
+export { WalletConnectSigner, createWalletConnectSigner } from './WalletConnectSigner';

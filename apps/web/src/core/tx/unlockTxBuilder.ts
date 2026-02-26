@@ -78,6 +78,53 @@ export interface UnlockParams {
   adapter?: ChainAdapter;
 }
 
+/**
+ * Parameters for building an unlock transaction payload that can be signed by
+ * an external wallet (e.g. browser extension via WalletConnect).
+ */
+export interface UnlockExternalSigningParams {
+  tranche: ClaimTranche;
+  network: Network;
+  destinationAddress: string;
+  feeRateSatPerByte?: number;
+}
+
+export interface UnlockSourceOutput {
+  outpointIndex: number;
+  outpointTransactionHash: Uint8Array;
+  sequenceNumber: number;
+  unlockingBytecode: Uint8Array;
+  valueSatoshis: bigint;
+  lockingBytecode: Uint8Array;
+  token?: {
+    amount: bigint;
+    category: Uint8Array;
+  };
+  contract?: {
+    abiFunction: {
+      name: string;
+      inputs: readonly { name: string; type: string }[];
+    };
+    redeemScript: Uint8Array;
+    artifact: Partial<{
+      contractName: string;
+      abi: readonly { name: string; inputs: readonly { name: string; type: string }[] }[];
+    }>;
+  };
+}
+
+export interface UnlockSigningPayload {
+  unsignedTxHex: string;
+  sourceOutputs: UnlockSourceOutput[];
+  expectedSignerAddress: string;
+}
+
+export interface UnlockPayloadResult {
+  success: boolean;
+  payload?: UnlockSigningPayload;
+  error?: string;
+}
+
 export interface UnlockResult {
   success: boolean;
   txid?: string;
@@ -98,6 +145,117 @@ const ESTIMATED_UNLOCK_TX_SIZE = 350; // Conservative estimate for single-input 
 // ============================================================================
 // Unlock Transaction Builder
 // ============================================================================
+
+/**
+ * Build an unsigned unlock transaction + source output metadata for extension
+ * wallet signing.
+ */
+export async function buildUnlockSigningPayload(
+  params: UnlockExternalSigningParams
+): Promise<UnlockPayloadResult> {
+  const { tranche, network, destinationAddress, feeRateSatPerByte = 1 } = params;
+
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    if (now < tranche.unlockTime) {
+      return {
+        success: false,
+        error: `Tranche is still locked until ${new Date(tranche.unlockTime * 1000).toISOString()}`,
+      };
+    }
+
+    const inputSatoshis = BigInt(tranche.lockbox.satoshis);
+    const fee = BigInt(Math.ceil(ESTIMATED_UNLOCK_TX_SIZE * feeRateSatPerByte * 1.15));
+    const outputSatoshis = inputSatoshis - fee;
+
+    if (outputSatoshis < MIN_DUST_SATOSHIS) {
+      return {
+        success: false,
+        error: `Output amount ${outputSatoshis} is below dust threshold after fee ${fee}`,
+      };
+    }
+
+    const redeemScript = hexToBytes(tranche.lockbox.redeemScriptHex);
+    const tokenAmount = BigInt(tranche.amountBase);
+    const destDecoded = decodeCashAddr(destinationAddress);
+    if (destDecoded.network !== network) {
+      return {
+        success: false,
+        error: `Destination address network (${destDecoded.network}) does not match campaign network (${network})`,
+      };
+    }
+    const destPubkeyHash = destDecoded.hash;
+
+    const tokenPrefix = buildTokenPrefix(tranche.tokenCategory, tokenAmount);
+    const p2pkhScript = buildP2PKHScript(destPubkeyHash);
+    const outputLockingScript = new Uint8Array(tokenPrefix.length + p2pkhScript.length);
+    outputLockingScript.set(tokenPrefix, 0);
+    outputLockingScript.set(p2pkhScript, tokenPrefix.length);
+
+    const outputs: TxOutput[] = [
+      {
+        satoshis: outputSatoshis,
+        lockingScript: bytesToHex(outputLockingScript),
+        token: {
+          category: tranche.tokenCategory,
+          amount: tokenAmount,
+        },
+      },
+    ];
+
+    const unsignedTxHex = serializeUnlockTransaction(
+      tranche.lockbox.outpoint.txid,
+      tranche.lockbox.outpoint.vout,
+      new Uint8Array(),
+      DEFAULT_SEQUENCE,
+      outputs,
+      tranche.unlockTime
+    );
+
+    const sha256 = await instantiateSha256();
+    const p2shScript = hexToBytes('a914' + bytesToHex(hash160(sha256, redeemScript)) + '87');
+    const sourceLockingScript = new Uint8Array(tokenPrefix.length + p2shScript.length);
+    sourceLockingScript.set(tokenPrefix, 0);
+    sourceLockingScript.set(p2shScript, tokenPrefix.length);
+
+    return {
+      success: true,
+      payload: {
+        unsignedTxHex,
+        expectedSignerAddress: tranche.beneficiaryAddress,
+        sourceOutputs: [
+          {
+            outpointIndex: tranche.lockbox.outpoint.vout,
+            outpointTransactionHash: hexToBytes(tranche.lockbox.outpoint.txid),
+            sequenceNumber: DEFAULT_SEQUENCE,
+            unlockingBytecode: new Uint8Array(),
+            valueSatoshis: inputSatoshis,
+            lockingBytecode: sourceLockingScript,
+            token: {
+              amount: tokenAmount,
+              category: hexToBytes(tranche.tokenCategory),
+            },
+            contract: {
+              abiFunction: {
+                name: 'unlock',
+                inputs: [],
+              },
+              redeemScript,
+              artifact: {
+                contractName: 'CashDropLockbox',
+              },
+            },
+          },
+        ],
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
 
 /**
  * Build, sign, and optionally broadcast an unlock transaction for a lockbox tranche.

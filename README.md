@@ -3,7 +3,7 @@
 [![CI](https://github.com/StudioLIQ/cashdropkit/actions/workflows/ci.yml/badge.svg)](https://github.com/StudioLIQ/cashdropkit/actions/workflows/ci.yml)
 [![Production Smoke](https://github.com/StudioLIQ/cashdropkit/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/StudioLIQ/cashdropkit/actions/workflows/production-smoke.yml)
 
-A **local-first** web console for **CashTokens airdrops and vesting (CLTV lockboxes)** with **local signing**, **chunked execution**, **pause/resume**, and **auditable reporting**.
+A **local-first** web console for **CashTokens airdrops and vesting (CLTV lockboxes)** with **extension-wallet signing**, **chunked execution**, **pause/resume**, and **auditable reporting**.
 
 ## What
 
@@ -25,10 +25,10 @@ Token distribution fails in practice for reasons beyond "how to build a transact
 
 ## Security Model
 
-**Your keys never leave this device.**
+**Your keys never leave your wallet app.**
 
-- Mnemonics encrypted at rest with AES-256-GCM (PBKDF2 key derivation, 100k iterations)
-- All signing happens locally in the browser (BIP143 sighash with SIGHASH_FORKID)
+- No recovery phrase input in CashDrop web flows
+- Signing is requested through BCH extension wallet connection (WalletConnect v2)
 - Chain data comes through untrusted Electrum/Fulcrum providers
 - Auto-lock on idle with configurable timeout
 - See [SECURITY.md](./SECURITY.md) for the full threat model
@@ -89,8 +89,8 @@ pnpm build         # Production build
 ### Setup (< 1 minute)
 
 1. Go to **Settings** > **Demo Preset** > **Download Sample CSV**
-2. Go to **Wallets** > **Create Wallet** (testnet, save mnemonic)
-3. Fund the wallet with testnet BCH and a test FT token
+2. Go to **Wallets** > **Connect Extension** and add connected address
+3. Fund that extension wallet address with testnet BCH and a test FT token
 
 ### Airdrop Flow
 
@@ -107,7 +107,7 @@ pnpm build         # Production build
 1. **Vesting** > **New Vesting** -- 2 tranches, unlock times a few minutes apart
 2. **Execute** -- Creates CLTV lockbox outputs on-chain
 3. **Export Claim Bundle** -- JSON file with outpoints + redeemScripts
-4. **Claim Page** (`/claim/[campaignId]`) -- Upload bundle, enter beneficiary address, see LOCKED vs UNLOCKABLE tranches, click Unlock when time passes
+4. **Claim Page** (`/claim/[campaignId]`) -- Upload bundle, connect extension, set beneficiary address, see LOCKED vs UNLOCKABLE tranches, click Unlock when time passes
 
 ### Key Demo Points
 
@@ -115,7 +115,7 @@ pnpm build         # Production build
 - **Pause/Resume**: mid-execution pause survives page reload
 - **Validation**: invalid CSV rows caught with precise error messages
 - **Audit trail**: CSV export maps every recipient to their txid
-- **Non-custodial**: mnemonic never leaves the browser
+- **Non-custodial**: seed phrase is never entered in web UI
 
 ## Architecture
 
@@ -126,19 +126,19 @@ src/
       dashboard/           # Summary cards + recent activity
       airdrops/            # Campaign list + wizard (7 steps)
       vesting/             # Vesting campaigns + lockbox creation
-      wallets/             # Create/import/manage wallets
+      wallets/             # Connect extension/manage watch-only wallets
       settings/            # Config + demo presets
       claim/[campaignId]/  # Beneficiary self-serve unlock page
   core/                    # Business logic (framework-independent)
     db/                    # Dexie schema, repositories, migrations
     crypto/                # PBKDF2 + AES-GCM encryption
-    signer/                # Signer interface + LocalMnemonicSigner
+    signer/                # Signer interface + WalletConnect signer
     adapters/chain/        # ChainAdapter interface + Electrum impl
     planner/               # Airdrop + vesting batch planning
     executor/              # Airdrop + vesting execution engines
     auditor/               # Report + claim bundle exporters
     tx/                    # Tx builder, fee estimator, lockbox scripts, unlock builder
-    wallet/                # BIP39/BIP32/BIP44, CashAddr
+    wallet/                # Wallet metadata + CashAddr
     token/                 # BCMR/OTR metadata lookup
     csv/                   # CSV parsing, validation, duplicate merge
     util/                  # BigInt JSON, validation, error templates, demo presets
@@ -162,6 +162,7 @@ Manage all environment variables in root `.env.local`:
 # Web (testnet only)
 NEXT_PUBLIC_DEFAULT_NETWORK=testnet
 NEXT_PUBLIC_TESTNET_ELECTRUM_URL=wss://chipnet.imaginary.cash:50004
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=replace-with-walletconnect-project-id
 NEXT_PUBLIC_AUTO_LOCK_MINUTES=15
 
 # API (testnet only)
@@ -173,6 +174,7 @@ ELECTRUM_TESTNET_URL=wss://chipnet.imaginary.cash:50004
 ```
 
 FE의 API endpoint/token은 소스에 하드코딩되어 있습니다:
+
 - API URL: `https://api.cashdropkit.com`
 - Bearer token: `cashdropkit-public-client-token`
 
@@ -201,7 +203,7 @@ Production target values:
 - **State**: Zustand
 - **Local DB**: IndexedDB via Dexie
 - **Crypto**: WebCrypto API (PBKDF2 + AES-256-GCM)
-- **Signing**: @bitauth/libauth (secp256k1, BIP143 sighash)
+- **Signing**: bch-connect + WalletConnect v2, @bitauth/libauth
 - **HD Keys**: @scure/bip32, @noble/hashes (BIP39/BIP44)
 - **Testing**: Vitest (550+ tests)
 
@@ -211,7 +213,7 @@ Production target values:
 
 - Airdrop: create / run / pause / resume / retry / export report
 - Vesting: cliff + tranches via CLTV lockboxes with claim/unlock page
-- Local signing (non-custodial)
+- Extension-wallet signing (non-custodial)
 - Resume-safe execution (txid persisted before broadcast)
 - CSV/JSON/txids export with per-recipient audit trail
 - Claim bundle export for beneficiary self-serve unlock

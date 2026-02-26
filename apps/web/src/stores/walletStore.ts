@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import type { Network, Wallet } from '@/core/db/types';
 import {
   createWallet,
+  createWatchOnlyWallet,
   deleteWallet,
   getActiveWallet,
   getAllWallets,
@@ -48,6 +49,7 @@ export interface WalletState {
     network: Network,
     passphrase: string
   ) => Promise<Wallet>;
+  addWatchOnlyWallet: (name: string, address: string, network: Network) => Promise<Wallet>;
   selectWallet: (walletId: string | undefined) => Promise<void>;
   removeWallet: (walletId: string) => Promise<void>;
   updateWalletName: (walletId: string, name: string) => Promise<void>;
@@ -140,6 +142,30 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({
         error: err instanceof Error ? err.message : 'Failed to import wallet',
         isImporting: false,
+      });
+      throw err;
+    }
+  },
+
+  addWatchOnlyWallet: async (name, address, network) => {
+    set({ isCreating: true, error: null });
+    try {
+      const wallet = await createWatchOnlyWallet(name, address, network);
+      const wallets = await getAllWallets();
+      set({
+        wallets,
+        isCreating: false,
+      });
+
+      if (!get().activeWalletId) {
+        await get().selectWallet(wallet.id);
+      }
+
+      return wallet;
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to add watch-only wallet',
+        isCreating: false,
       });
       throw err;
     }

@@ -2,10 +2,13 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
+import { hashTransaction, hexToBin } from '@bitauth/libauth';
+import { useSignTransaction, useWallet } from 'bch-connect';
+
 import type { Network } from '@/core/db/types';
 import type { ClaimBundle, ClaimTranche, UnlockResult } from '@/core/tx/unlockTxBuilder';
 import {
-  buildAndSignUnlockTx,
+  buildUnlockSigningPayload,
   filterTranchesForAddress,
   getTrancheStatus,
   parseClaimBundle,
@@ -34,10 +37,17 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const [jsonText, setJsonText] = useState('');
 
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
-  const [mnemonic, setMnemonic] = useState('');
-  const [showMnemonic, setShowMnemonic] = useState(false);
-
   const [unlockStates, setUnlockStates] = useState<UnlockState>({});
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  const {
+    address: connectedAddress,
+    isConnected,
+    connect,
+    connectError,
+    refetchAddresses,
+  } = useWallet();
+  const { signTransaction } = useSignTransaction();
 
   // Filter tranches for the beneficiary
   const myTranches = useMemo(() => {
@@ -54,6 +64,11 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
     () => myTranches.filter((t) => getTrancheStatus(t.unlockTime) === 'UNLOCKABLE').length,
     [myTranches]
   );
+
+  const normalizedConnected = connectedAddress?.trim().toLowerCase() || '';
+  const normalizedBeneficiary = beneficiaryAddress.trim().toLowerCase();
+  const isConnectedAddressMatchingBeneficiary =
+    Boolean(normalizedConnected) && normalizedConnected === normalizedBeneficiary;
 
   // ========================================================================
   // Bundle Loading
@@ -94,46 +109,138 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
     reader.readAsText(file);
   }, []);
 
+  const handleConnectWallet = useCallback(async () => {
+    try {
+      setIsConnecting(true);
+      await connect();
+      await refetchAddresses();
+    } catch {
+      // connectError from hook is rendered in UI
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [connect, refetchAddresses]);
+
+  const applyConnectedAddress = useCallback(() => {
+    if (connectedAddress) {
+      setBeneficiaryAddress(connectedAddress);
+    }
+  }, [connectedAddress]);
+
   // ========================================================================
   // Unlock
   // ========================================================================
 
   const handleUnlock = useCallback(
     async (tranche: ClaimTranche) => {
-      if (!mnemonic.trim()) {
-        setUnlockStates((prev) => ({
-          ...prev,
-          [tranche.trancheId]: {
-            status: 'error',
-            result: { success: false, error: 'Enter your mnemonic to unlock' },
-          },
-        }));
-        return;
-      }
-
       setUnlockStates((prev) => ({
         ...prev,
         [tranche.trancheId]: { status: 'unlocking' },
       }));
 
-      const result = await buildAndSignUnlockTx({
-        tranche,
-        network: (bundle?.network || 'testnet') as Network,
-        mnemonic: mnemonic.trim(),
-        destinationAddress: beneficiaryAddress.trim(),
-        feeRateSatPerByte: 1,
-        // No adapter for now - just build the tx
-      });
+      try {
+        if (!isConnected) {
+          await handleConnectWallet();
+        }
 
-      setUnlockStates((prev) => ({
-        ...prev,
-        [tranche.trancheId]: {
-          status: result.success ? 'done' : 'error',
-          result,
-        },
-      }));
+        const currentConnectedAddress = connectedAddress?.trim() || '';
+        if (!currentConnectedAddress) {
+          setUnlockStates((prev) => ({
+            ...prev,
+            [tranche.trancheId]: {
+              status: 'error',
+              result: { success: false, error: 'Connect extension wallet first' },
+            },
+          }));
+          return;
+        }
+
+        if (currentConnectedAddress.toLowerCase() !== tranche.beneficiaryAddress.toLowerCase()) {
+          setUnlockStates((prev) => ({
+            ...prev,
+            [tranche.trancheId]: {
+              status: 'error',
+              result: {
+                success: false,
+                error: 'Connected wallet address must match tranche beneficiary address',
+              },
+            },
+          }));
+          return;
+        }
+
+        const payloadResult = await buildUnlockSigningPayload({
+          tranche,
+          network: (bundle?.network || 'testnet') as Network,
+          destinationAddress: currentConnectedAddress,
+          feeRateSatPerByte: 1,
+        });
+
+        if (!payloadResult.success || !payloadResult.payload) {
+          setUnlockStates((prev) => ({
+            ...prev,
+            [tranche.trancheId]: {
+              status: 'error',
+              result: {
+                success: false,
+                error: payloadResult.error || 'Failed to build unlock transaction',
+              },
+            },
+          }));
+          return;
+        }
+
+        const response = await signTransaction({
+          txRequest: {
+            transaction: payloadResult.payload.unsignedTxHex,
+            sourceOutputs: payloadResult.payload.sourceOutputs,
+            broadcast: false,
+            userPrompt: 'Sign unlock transaction',
+          },
+        });
+
+        if (!response) {
+          setUnlockStates((prev) => ({
+            ...prev,
+            [tranche.trancheId]: {
+              status: 'error',
+              result: { success: false, error: 'Signature request rejected or canceled' },
+            },
+          }));
+          return;
+        }
+
+        const txHex = normalizeHex(response.signedTransaction);
+        let txid = normalizeHex(response.signedTransactionHash);
+        if (txid.length !== 64) {
+          txid = hashTransaction(hexToBin(txHex));
+        }
+
+        setUnlockStates((prev) => ({
+          ...prev,
+          [tranche.trancheId]: {
+            status: 'done',
+            result: {
+              success: true,
+              txid,
+              txHex,
+            },
+          },
+        }));
+      } catch (error) {
+        setUnlockStates((prev) => ({
+          ...prev,
+          [tranche.trancheId]: {
+            status: 'error',
+            result: {
+              success: false,
+              error: error instanceof Error ? error.message : 'Unlock failed',
+            },
+          },
+        }));
+      }
     },
-    [mnemonic, beneficiaryAddress, bundle]
+    [bundle?.network, connectedAddress, isConnected, handleConnectWallet, signTransaction]
   );
 
   // ========================================================================
@@ -263,6 +370,41 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
             </div>
           </div>
 
+          {/* Extension wallet status */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-950">
+            <h2 className="text-lg font-medium text-blue-900 dark:text-blue-200">
+              Extension Wallet Required
+            </h2>
+            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+              Recovery phrase is no longer accepted in this page. Connect your BCH extension wallet
+              and sign each unlock transaction from the wallet popup.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleConnectWallet}
+                disabled={isConnected || isConnecting}
+                className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-zinc-900 dark:text-blue-300"
+              >
+                {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Connect Extension'}
+              </button>
+              <button
+                type="button"
+                onClick={applyConnectedAddress}
+                disabled={!connectedAddress}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              >
+                Use Connected Address
+              </button>
+              <span className="text-xs text-blue-700 dark:text-blue-300">
+                {connectedAddress ? `Connected: ${connectedAddress}` : 'Not connected'}
+              </span>
+            </div>
+            {connectError && (
+              <p className="mt-2 text-xs text-red-700 dark:text-red-400">{connectError.message}</p>
+            )}
+          </div>
+
           {/* Address Input */}
           <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
             <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Your Address</h2>
@@ -282,6 +424,14 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
                 No tranches found for this address in the bundle.
               </p>
             )}
+
+            {beneficiaryAddress.trim() &&
+              connectedAddress &&
+              !isConnectedAddressMatchingBeneficiary && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  Connected address does not match beneficiary address. Unlock is blocked.
+                </p>
+              )}
           </div>
 
           {/* Tranches */}
@@ -301,35 +451,6 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
                 </span>
               </div>
 
-              {/* Mnemonic Input (show only if there are unlockable tranches) */}
-              {unlockableCount > 0 && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-                  <label className="block text-sm font-medium text-amber-800 dark:text-amber-300">
-                    Mnemonic (required to sign unlock transaction)
-                  </label>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type={showMnemonic ? 'text' : 'password'}
-                      className="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-mono dark:border-amber-700 dark:bg-zinc-900 dark:text-zinc-300"
-                      placeholder="word1 word2 word3 ..."
-                      value={mnemonic}
-                      onChange={(e) => setMnemonic(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowMnemonic(!showMnemonic)}
-                      className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-700 dark:bg-zinc-900 dark:text-zinc-400"
-                    >
-                      {showMnemonic ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                    Your mnemonic never leaves this device. It is used locally to sign the unlock
-                    transaction.
-                  </p>
-                </div>
-              )}
-
               {/* Tranche List */}
               <div className="mt-4 space-y-3">
                 {myTranches.map((tranche) => (
@@ -339,6 +460,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
                     tokenSymbol={bundle.token.symbol}
                     tokenDecimals={bundle.token.decimals}
                     unlockState={unlockStates[tranche.trancheId]}
+                    unlockDisabled={!isConnectedAddressMatchingBeneficiary}
                     onUnlock={() => handleUnlock(tranche)}
                   />
                 ))}
@@ -360,12 +482,14 @@ function TrancheCard({
   tokenSymbol,
   tokenDecimals,
   unlockState,
+  unlockDisabled,
   onUnlock,
 }: {
   tranche: ClaimTranche;
   tokenSymbol?: string;
   tokenDecimals?: number;
   unlockState?: { status: 'idle' | 'unlocking' | 'done' | 'error'; result?: UnlockResult };
+  unlockDisabled: boolean;
   onUnlock: () => void;
 }) {
   const status = getTrancheStatus(tranche.unlockTime);
@@ -387,7 +511,7 @@ function TrancheCard({
             : 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900'
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -416,8 +540,8 @@ function TrancheCard({
           <button
             type="button"
             onClick={onUnlock}
-            disabled={isUnlocking}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+            disabled={unlockDisabled || isUnlocking}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isUnlocking ? 'Unlocking...' : 'Unlock'}
           </button>
@@ -449,6 +573,10 @@ function TrancheCard({
 // ============================================================================
 // Helpers
 // ============================================================================
+
+function normalizeHex(value: string): string {
+  return value.startsWith('0x') ? value.slice(2).toLowerCase() : value.toLowerCase();
+}
 
 function formatTokenAmount(amountBase: string, decimals?: number): string {
   if (!decimals || decimals === 0) return amountBase;
