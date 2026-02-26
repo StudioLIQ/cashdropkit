@@ -32,13 +32,13 @@ export default function WalletsPage() {
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
+    refetchAddresses,
   } = useWallet();
 
   const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
 
   const [network, setNetwork] = useState<Network>('testnet');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [walletName, setWalletName] = useState('Extension Wallet');
   const [localError, setLocalError] = useState<string | null>(null);
 
   const extensionConfigured = hasWalletConnectProjectIdConfigured();
@@ -49,6 +49,23 @@ export default function WalletsPage() {
       setNetwork('testnet');
     });
   }, [loadWallets]);
+
+  const syncConnectedWallet = useCallback(
+    async (address: string) => {
+      const existing = wallets.find(
+        (wallet) => wallet.watchAddress === address || wallet.addresses?.includes(address)
+      );
+      if (existing) {
+        await selectWallet(existing.id);
+        return;
+      }
+
+      const short = `${address.slice(0, 8)}...${address.slice(-6)}`;
+      const wallet = await addWatchOnlyWallet(`Paytaca ${short}`, address, network);
+      await selectWallet(wallet.id);
+    },
+    [wallets, selectWallet, addWatchOnlyWallet, network]
+  );
 
   const handleDelete = useCallback(
     async (walletId: string) => {
@@ -62,40 +79,18 @@ export default function WalletsPage() {
     setLocalError(null);
     try {
       await connect();
+      await refetchAddresses();
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     }
-  }, [connect]);
+  }, [connect, refetchAddresses]);
 
-  const handleAddConnectedWallet = useCallback(async () => {
-    setLocalError(null);
-
-    if (!effectiveExtensionAddress) {
-      setLocalError('Connect an extension wallet first');
-      return;
-    }
-
-    const existing = wallets.find(
-      (wallet) =>
-        wallet.watchAddress === effectiveExtensionAddress ||
-        wallet.addresses?.includes(effectiveExtensionAddress)
-    );
-    if (existing) {
-      await selectWallet(existing.id);
-      return;
-    }
-
-    try {
-      const wallet = await addWatchOnlyWallet(
-        walletName.trim() || 'Extension Wallet',
-        effectiveExtensionAddress,
-        network
-      );
-      await selectWallet(wallet.id);
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to add extension wallet');
-    }
-  }, [effectiveExtensionAddress, wallets, selectWallet, addWatchOnlyWallet, walletName, network]);
+  useEffect(() => {
+    if (!isConnected || !effectiveExtensionAddress) return;
+    syncConnectedWallet(effectiveExtensionAddress).catch((err) => {
+      setLocalError(err instanceof Error ? err.message : 'Failed to sync connected wallet');
+    });
+  }, [isConnected, effectiveExtensionAddress, syncConnectedWallet]);
 
   const effectiveError = error || localError || connectError?.message || null;
 
@@ -105,7 +100,7 @@ export default function WalletsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Wallets</h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Connect a BCH extension wallet and use watch-only addresses in CashDrop.
+            Connect Paytaca and CashDrop will auto-register/select the wallet address.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -115,7 +110,7 @@ export default function WalletsPage() {
               onClick={handleConnect}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
             >
-              Connect Extension
+              Connect Paytaca
             </button>
           ) : (
             <button
@@ -140,27 +135,15 @@ export default function WalletsPage() {
       )}
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
-            value={walletName}
-            onChange={(e) => setWalletName(e.target.value)}
-            placeholder="Wallet display name"
-            className="min-w-64 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-          <button
-            type="button"
-            onClick={handleAddConnectedWallet}
-            disabled={!isConnected || !effectiveExtensionAddress || isCreating}
-            className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isCreating ? 'Adding...' : 'Add Connected Address'}
-          </button>
-        </div>
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-          {isConnected && effectiveExtensionAddress
-            ? `Connected address: ${effectiveExtensionAddress}`
-            : 'Connect extension to read address'}
+          {isConnected && effectiveExtensionAddress ? (
+            <>
+              Connected address: {effectiveExtensionAddress}
+              {isCreating ? ' (syncing...)' : ''}
+            </>
+          ) : (
+            'Connect extension to read and auto-register wallet address'
+          )}
         </p>
       </div>
 
@@ -200,7 +183,7 @@ export default function WalletsPage() {
               No wallets yet
             </h3>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Connect an extension wallet, then add its address as watch-only.
+              Connect Paytaca wallet to auto-register your address.
             </p>
           </div>
         </div>

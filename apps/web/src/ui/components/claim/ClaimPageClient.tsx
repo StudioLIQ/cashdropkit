@@ -35,8 +35,6 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const [bundle, setBundle] = useState<ClaimBundle | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [jsonText, setJsonText] = useState('');
-
-  const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
   const [unlockStates, setUnlockStates] = useState<UnlockState>({});
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -50,11 +48,12 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   } = useWallet();
   const { signTransaction } = useSignTransaction();
   const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
+  const beneficiaryAddress = effectiveConnectedAddress || '';
 
   // Filter tranches for the beneficiary
   const myTranches = useMemo(() => {
-    if (!bundle || !beneficiaryAddress.trim()) return [];
-    return filterTranchesForAddress(bundle, beneficiaryAddress.trim());
+    if (!bundle || !beneficiaryAddress) return [];
+    return filterTranchesForAddress(bundle, beneficiaryAddress);
   }, [bundle, beneficiaryAddress]);
 
   const lockedCount = useMemo(
@@ -68,7 +67,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   );
 
   const normalizedConnected = effectiveConnectedAddress?.trim().toLowerCase() || '';
-  const normalizedBeneficiary = beneficiaryAddress.trim().toLowerCase();
+  const normalizedBeneficiary = beneficiaryAddress.toLowerCase();
   const isConnectedAddressMatchingBeneficiary =
     Boolean(normalizedConnected) && normalizedConnected === normalizedBeneficiary;
 
@@ -123,12 +122,6 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
     }
   }, [connect, refetchAddresses]);
 
-  const applyConnectedAddress = useCallback(() => {
-    if (effectiveConnectedAddress) {
-      setBeneficiaryAddress(effectiveConnectedAddress);
-    }
-  }, [effectiveConnectedAddress]);
-
   // ========================================================================
   // Unlock
   // ========================================================================
@@ -141,10 +134,6 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
       }));
 
       try {
-        if (!isConnected) {
-          await handleConnectWallet();
-        }
-
         const currentConnectedAddress = effectiveConnectedAddress?.trim() || '';
         if (!currentConnectedAddress) {
           setUnlockStates((prev) => ({
@@ -242,7 +231,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
         }));
       }
     },
-    [bundle?.network, effectiveConnectedAddress, isConnected, handleConnectWallet, signTransaction]
+    [bundle?.network, effectiveConnectedAddress, signTransaction]
   );
 
   // ========================================================================
@@ -362,7 +351,6 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
                   setBundle(null);
                   setJsonText('');
                   setParseError(null);
-                  setBeneficiaryAddress('');
                   setUnlockStates({});
                 }}
                 className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -385,18 +373,10 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
               <button
                 type="button"
                 onClick={handleConnectWallet}
-                disabled={isConnected || isConnecting}
+                disabled={isConnecting}
                 className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-zinc-900 dark:text-blue-300"
               >
                 {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Connect Extension'}
-              </button>
-              <button
-                type="button"
-                onClick={applyConnectedAddress}
-                disabled={!effectiveConnectedAddress}
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
-              >
-                Use Connected Address
               </button>
               <span className="text-xs text-blue-700 dark:text-blue-300">
                 {effectiveConnectedAddress
@@ -409,33 +389,36 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
             )}
           </div>
 
-          {/* Address Input */}
+          {/* Connected address */}
           <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Your Address</h2>
+            <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Wallet Address</h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Enter your beneficiary address to view your tranches.
+              Claim uses your currently connected extension wallet address automatically.
             </p>
             <input
               type="text"
               className="mt-3 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-mono dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
-              placeholder="bchtest:qz..."
+              placeholder="Connect extension wallet"
               value={beneficiaryAddress}
-              onChange={(e) => setBeneficiaryAddress(e.target.value)}
+              readOnly
             />
 
-            {beneficiaryAddress.trim() && myTranches.length === 0 && (
+            {beneficiaryAddress && myTranches.length === 0 && (
               <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                 No tranches found for this address in the bundle.
               </p>
             )}
+            {!beneficiaryAddress && (
+              <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                Connect your Paytaca wallet to load claimable tranches.
+              </p>
+            )}
 
-            {beneficiaryAddress.trim() &&
-              effectiveConnectedAddress &&
-              !isConnectedAddressMatchingBeneficiary && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  Connected address does not match beneficiary address. Unlock is blocked.
-                </p>
-              )}
+            {beneficiaryAddress && !isConnectedAddressMatchingBeneficiary && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                Connected address does not match beneficiary address. Unlock is blocked.
+              </p>
+            )}
           </div>
 
           {/* Tranches */}
