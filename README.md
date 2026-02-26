@@ -1,5 +1,8 @@
 # CashDrop Kit
 
+[![CI](https://github.com/StudioLIQ/cashdropkit/actions/workflows/ci.yml/badge.svg)](https://github.com/StudioLIQ/cashdropkit/actions/workflows/ci.yml)
+[![Production Smoke](https://github.com/StudioLIQ/cashdropkit/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/StudioLIQ/cashdropkit/actions/workflows/production-smoke.yml)
+
 A **local-first** web console for **CashTokens airdrops and vesting (CLTV lockboxes)** with **local signing**, **chunked execution**, **pause/resume**, and **auditable reporting**.
 
 ## What
@@ -73,6 +76,13 @@ pnpm typecheck     # TypeScript type checking (0 errors)
 pnpm lint          # ESLint
 pnpm build         # Production build
 ```
+
+### Production Readiness Signals
+
+- Push to `main` runs deploy + post-deploy hardened smoke test in CI
+- Separate scheduled production smoke runs every 6 hours
+- Smoke checks validate route availability, auth gates, error contracts, and CORS behavior
+- Every smoke run emits a summarized pass/fail report + downloadable logs
 
 ## Demo Walkthrough (2-3 minutes)
 

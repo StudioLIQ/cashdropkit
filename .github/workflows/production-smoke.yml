@@ -1,0 +1,38 @@
+name: Production Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke Test (prod)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for rollout stabilization
+        run: sleep 20
+
+      - name: Run hardened production smoke
+        env:
+          WEB_BASE: ${{ vars.WEB_URL }}
+          API_BASE: ${{ vars.API_URL }}
+          API_TOKEN: ${{ secrets.PROD_SMOKE_API_TOKEN }}
+        run: |
+          ./scripts/scenario-prod-smoke.sh | tee production-smoke.log
+
+      - name: Upload smoke log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-log
+          path: production-smoke.log
+          if-no-files-found: warn

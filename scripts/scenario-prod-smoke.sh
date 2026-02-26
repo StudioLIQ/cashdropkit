@@ -8,10 +8,17 @@ API_TOKEN="${API_TOKEN:-cashdropkit-public-client-token}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-25}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-10}"
 FAIL=0
+PASS_COUNT=0
+FAIL_COUNT=0
+TOTAL_COUNT=0
+FAILED_CHECKS=""
+START_TS="$(date +%s)"
 
 HEADERS_FILE="$(mktemp -t cashdropkit-smoke-headers.XXXXXX)"
 BODY_FILE="$(mktemp -t cashdropkit-smoke-body.XXXXXX)"
 REQ_CODE=""
+REQ_TIME="0"
+REQ_SIZE="0"
 
 cleanup() {
   rm -f "$HEADERS_FILE" "$BODY_FILE"
@@ -25,11 +32,21 @@ say() {
 
 pass() {
   printf '[PASS] %s\n' "$1"
+  PASS_COUNT=$((PASS_COUNT + 1))
+  TOTAL_COUNT=$((TOTAL_COUNT + 1))
 }
 
 fail() {
   printf '[FAIL] %s\n' "$1"
   FAIL=1
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+  TOTAL_COUNT=$((TOTAL_COUNT + 1))
+  if [ -z "$FAILED_CHECKS" ]; then
+    FAILED_CHECKS="$1"
+  else
+    FAILED_CHECKS="$FAILED_CHECKS
+$1"
+  fi
 }
 
 request() {
@@ -38,7 +55,7 @@ request() {
   shift 2
   : >"$HEADERS_FILE"
   : >"$BODY_FILE"
-  REQ_CODE="$(
+  raw="$(
     curl -L -sS \
       --max-time "$CURL_MAX_TIME" \
       --connect-timeout "$CURL_CONNECT_TIMEOUT" \
@@ -46,18 +63,21 @@ request() {
       -D "$HEADERS_FILE" \
       -o "$BODY_FILE" \
       "$@" \
-      -w '%{http_code}' \
+      -w '%{http_code}|%{time_total}|%{size_download}' \
       "$url" || true
   )"
+  REQ_CODE="$(printf '%s' "$raw" | awk -F'|' '{print $1}')"
+  REQ_TIME="$(printf '%s' "$raw" | awk -F'|' '{print $2}')"
+  REQ_SIZE="$(printf '%s' "$raw" | awk -F'|' '{print $3}')"
 }
 
 assert_code() {
   name="$1"
   expected="$2"
   if [ "$REQ_CODE" = "$expected" ]; then
-    pass "$name (code=$REQ_CODE)"
+    pass "$name (code=$REQ_CODE, t=${REQ_TIME}s)"
   else
-    fail "$name (expected $expected, got $REQ_CODE)"
+    fail "$name (expected $expected, got $REQ_CODE, t=${REQ_TIME}s)"
   fi
 }
 
@@ -72,9 +92,9 @@ assert_code_in() {
     fi
   done
   if [ "$matched" -eq 1 ]; then
-    pass "$name (code=$REQ_CODE)"
+    pass "$name (code=$REQ_CODE, t=${REQ_TIME}s)"
   else
-    fail "$name (expected one of: $allowed, got $REQ_CODE)"
+    fail "$name (expected one of: $allowed, got $REQ_CODE, t=${REQ_TIME}s)"
   fi
 }
 
@@ -267,9 +287,40 @@ assert_header_equals "cors preflight ACAO reflected" "access-control-allow-origi
 assert_header_contains "cors preflight methods include GET" "access-control-allow-methods" "GET"
 
 say ""
+DURATION_SEC=$(( $(date +%s) - START_TS ))
+if [ "$TOTAL_COUNT" -gt 0 ]; then
+  PASS_RATE=$((PASS_COUNT * 100 / TOTAL_COUNT))
+else
+  PASS_RATE=0
+fi
+say "SUMMARY total=$TOTAL_COUNT pass=$PASS_COUNT fail=$FAIL_COUNT pass_rate=${PASS_RATE}% duration=${DURATION_SEC}s"
+
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    printf '## Production Smoke Summary\n'
+    printf '\n'
+    printf '| Metric | Value |\n'
+    printf '|---|---|\n'
+    printf '| Web Base | `%s` |\n' "$WEB_BASE"
+    printf '| API Base | `%s` |\n' "$API_BASE"
+    printf '| Total Checks | `%s` |\n' "$TOTAL_COUNT"
+    printf '| Passed | `%s` |\n' "$PASS_COUNT"
+    printf '| Failed | `%s` |\n' "$FAIL_COUNT"
+    printf '| Pass Rate | `%s%%` |\n' "$PASS_RATE"
+    printf '| Duration | `%ss` |\n' "$DURATION_SEC"
+    if [ "$FAIL_COUNT" -gt 0 ]; then
+      printf '\n'
+      printf '### Failed Checks\n'
+      printf '%s\n' "$FAILED_CHECKS" | sed 's/^/- /'
+    fi
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   say "ALL CHECKS PASSED"
 else
+  say "FAILED CHECKS:"
+  printf '%s\n' "$FAILED_CHECKS" | sed 's/^/ - /'
   say "SMOKE CHECKS FAILED"
   exit 1
 fi

@@ -151,6 +151,36 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
 
+  smoke-prod:
+    name: Smoke Test (Post-deploy)
+    runs-on: ubuntu-latest
+    needs: [deploy-api, deploy-worker, deploy-web]
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.deploy-api.result == 'success' &&
+      needs.deploy-worker.result == 'success' &&
+      needs.deploy-web.result == 'success'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for deployment propagation
+        run: sleep 300
+      - name: Run hardened production smoke
+        env:
+          WEB_BASE: ${{ vars.WEB_URL }}
+          API_BASE: ${{ vars.API_URL }}
+          API_TOKEN: ${{ secrets.PROD_SMOKE_API_TOKEN }}
+        run: |
+          ./scripts/scenario-prod-smoke.sh | tee post-deploy-smoke.log
+      - name: Upload post-deploy smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deploy-smoke-log
+          path: post-deploy-smoke.log
+          if-no-files-found: warn
+
   # ===========================================================================
   # Post-deploy notification
   # ===========================================================================
@@ -158,7 +188,7 @@ jobs:
   notify:
     name: Deploy Summary
     runs-on: ubuntu-latest
-    needs: [deploy-api, deploy-worker, deploy-web]
+    needs: [deploy-api, deploy-worker, deploy-web, smoke-prod]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Summary
@@ -170,6 +200,7 @@ jobs:
           echo "| API | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Worker | ${{ needs.deploy-worker.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web | ${{ needs.deploy-web.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-deploy smoke | ${{ needs.smoke-prod.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "Ref: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
@@ -179,7 +210,8 @@ jobs:
         if: |
           needs.deploy-api.result == 'failure' ||
           needs.deploy-worker.result == 'failure' ||
-          needs.deploy-web.result == 'failure'
+          needs.deploy-web.result == 'failure' ||
+          needs.smoke-prod.result == 'failure'
         run: |
-          echo "One or more deploy jobs failed. See deployment-runbook.md for rollback procedures."
+          echo "Deploy and/or post-deploy smoke failed. See deployment-runbook.md for rollback procedures."
           exit 1
