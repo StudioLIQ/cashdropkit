@@ -75,7 +75,7 @@ function ConnectionIndicator({
 
       {/* Tooltip with error details */}
       {showTooltip && lastError && (
-        <div className="cdk-panel absolute left-0 top-full z-30 mt-2 w-64 rounded-xl p-3 text-sm">
+        <div className="cdk-panel absolute left-0 top-full z-[72] mt-2 w-64 rounded-xl p-3 text-sm">
           <div className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">Connection Error</div>
           <div className="text-zinc-500 dark:text-zinc-400">{lastError}</div>
           {canRetry && (
@@ -120,7 +120,7 @@ export function Topbar({
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
 
   return (
-    <header className="cdk-topbar flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+    <header className="cdk-topbar relative z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
       <div className="flex flex-wrap items-center gap-2 md:gap-3">
         <NetworkSelector
           network={network}
@@ -171,8 +171,8 @@ export function Topbar({
 
           {isCreateMenuOpen && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsCreateMenuOpen(false)} />
-              <div className="cdk-panel absolute right-0 top-full z-20 mt-2 w-52 rounded-xl py-1.5">
+              <div className="fixed inset-0 z-[70]" onClick={() => setIsCreateMenuOpen(false)} />
+              <div className="cdk-panel absolute right-0 top-full z-[80] mt-2 w-52 rounded-xl py-1.5">
                 <Link
                   href="/airdrops/new"
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-emerald-50/70 dark:text-zinc-300 dark:hover:bg-emerald-950/30"

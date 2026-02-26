@@ -25,7 +25,16 @@ export default function WalletsPage() {
     clearError,
   } = useWalletStore();
 
-  const { connect, disconnect, isConnected, address: extensionAddress, connectError } = useWallet();
+  const {
+    connect,
+    disconnect,
+    isConnected,
+    address: extensionAddress,
+    tokenAddress: extensionTokenAddress,
+    connectError,
+  } = useWallet();
+
+  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
 
   const [network, setNetwork] = useState<Network>('testnet');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -61,14 +70,15 @@ export default function WalletsPage() {
   const handleAddConnectedWallet = useCallback(async () => {
     setLocalError(null);
 
-    if (!extensionAddress) {
+    if (!effectiveExtensionAddress) {
       setLocalError('Connect an extension wallet first');
       return;
     }
 
     const existing = wallets.find(
       (wallet) =>
-        wallet.watchAddress === extensionAddress || wallet.addresses?.includes(extensionAddress)
+        wallet.watchAddress === effectiveExtensionAddress ||
+        wallet.addresses?.includes(effectiveExtensionAddress)
     );
     if (existing) {
       await selectWallet(existing.id);
@@ -78,14 +88,14 @@ export default function WalletsPage() {
     try {
       const wallet = await addWatchOnlyWallet(
         walletName.trim() || 'Extension Wallet',
-        extensionAddress,
+        effectiveExtensionAddress,
         network
       );
       await selectWallet(wallet.id);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to add extension wallet');
     }
-  }, [extensionAddress, wallets, selectWallet, addWatchOnlyWallet, walletName, network]);
+  }, [effectiveExtensionAddress, wallets, selectWallet, addWatchOnlyWallet, walletName, network]);
 
   const effectiveError = error || localError || connectError?.message || null;
 
@@ -141,15 +151,15 @@ export default function WalletsPage() {
           <button
             type="button"
             onClick={handleAddConnectedWallet}
-            disabled={!isConnected || !extensionAddress || isCreating}
+            disabled={!isConnected || !effectiveExtensionAddress || isCreating}
             className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreating ? 'Adding...' : 'Add Connected Address'}
           </button>
         </div>
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-          {isConnected && extensionAddress
-            ? `Connected address: ${extensionAddress}`
+          {isConnected && effectiveExtensionAddress
+            ? `Connected address: ${effectiveExtensionAddress}`
             : 'Connect extension to read address'}
         </p>
       </div>

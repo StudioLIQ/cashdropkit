@@ -45,10 +45,12 @@ export function ExecuteStep() {
   const { signTransaction } = useSignTransaction();
   const {
     address: connectedAddress,
+    tokenAddress: connectedTokenAddress,
     isConnected: isExtensionConnected,
     connect: connectExtensionWallet,
     connectError,
   } = useWallet();
+  const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
 
   // Local UI state
   const [forceRebuild, setForceRebuild] = useState(false);
@@ -138,7 +140,7 @@ export function ExecuteStep() {
         return;
       }
 
-      if (connectedAddress && sourceAddress !== connectedAddress) {
+      if (effectiveConnectedAddress && sourceAddress !== effectiveConnectedAddress) {
         setLocalError('Active wallet address and connected extension address do not match');
         return;
       }
@@ -174,7 +176,7 @@ export function ExecuteStep() {
     },
     [
       activeWallet,
-      connectedAddress,
+      effectiveConnectedAddress,
       isExtensionConnected,
       connectExtensionWallet,
       signTransaction,
@@ -412,7 +414,7 @@ export function ExecuteStep() {
           </button>
           <span className="text-xs text-blue-700 dark:text-blue-400">
             {isExtensionConnected
-              ? `Connected: ${(connectedAddress || '').slice(0, 16)}...`
+              ? `Connected: ${(effectiveConnectedAddress || '').slice(0, 16)}...`
               : 'Not connected'}
           </span>
         </div>

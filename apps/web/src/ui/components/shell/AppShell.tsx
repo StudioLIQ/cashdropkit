@@ -132,7 +132,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="cdk-orb cdk-orb-1" />
       <div className="cdk-orb cdk-orb-2" />
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-visible">
         <Topbar
           network={network}
           connectionStatus={status}

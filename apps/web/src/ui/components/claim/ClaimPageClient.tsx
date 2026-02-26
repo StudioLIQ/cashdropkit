@@ -42,12 +42,14 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
 
   const {
     address: connectedAddress,
+    tokenAddress: connectedTokenAddress,
     isConnected,
     connect,
     connectError,
     refetchAddresses,
   } = useWallet();
   const { signTransaction } = useSignTransaction();
+  const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
 
   // Filter tranches for the beneficiary
   const myTranches = useMemo(() => {
@@ -65,7 +67,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
     [myTranches]
   );
 
-  const normalizedConnected = connectedAddress?.trim().toLowerCase() || '';
+  const normalizedConnected = effectiveConnectedAddress?.trim().toLowerCase() || '';
   const normalizedBeneficiary = beneficiaryAddress.trim().toLowerCase();
   const isConnectedAddressMatchingBeneficiary =
     Boolean(normalizedConnected) && normalizedConnected === normalizedBeneficiary;
@@ -122,10 +124,10 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   }, [connect, refetchAddresses]);
 
   const applyConnectedAddress = useCallback(() => {
-    if (connectedAddress) {
-      setBeneficiaryAddress(connectedAddress);
+    if (effectiveConnectedAddress) {
+      setBeneficiaryAddress(effectiveConnectedAddress);
     }
-  }, [connectedAddress]);
+  }, [effectiveConnectedAddress]);
 
   // ========================================================================
   // Unlock
@@ -143,7 +145,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
           await handleConnectWallet();
         }
 
-        const currentConnectedAddress = connectedAddress?.trim() || '';
+        const currentConnectedAddress = effectiveConnectedAddress?.trim() || '';
         if (!currentConnectedAddress) {
           setUnlockStates((prev) => ({
             ...prev,
@@ -240,7 +242,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
         }));
       }
     },
-    [bundle?.network, connectedAddress, isConnected, handleConnectWallet, signTransaction]
+    [bundle?.network, effectiveConnectedAddress, isConnected, handleConnectWallet, signTransaction]
   );
 
   // ========================================================================
@@ -391,13 +393,15 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
               <button
                 type="button"
                 onClick={applyConnectedAddress}
-                disabled={!connectedAddress}
+                disabled={!effectiveConnectedAddress}
                 className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
               >
                 Use Connected Address
               </button>
               <span className="text-xs text-blue-700 dark:text-blue-300">
-                {connectedAddress ? `Connected: ${connectedAddress}` : 'Not connected'}
+                {effectiveConnectedAddress
+                  ? `Connected: ${effectiveConnectedAddress}`
+                  : 'Not connected'}
               </span>
             </div>
             {connectError && (
@@ -426,7 +430,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
             )}
 
             {beneficiaryAddress.trim() &&
-              connectedAddress &&
+              effectiveConnectedAddress &&
               !isConnectedAddressMatchingBeneficiary && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                   Connected address does not match beneficiary address. Unlock is blocked.
