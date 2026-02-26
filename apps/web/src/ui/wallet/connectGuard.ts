@@ -1,5 +1,7 @@
 'use client';
 
+import { connectPaytacaDirect } from './paytacaDirect';
+
 function normalizeWalletConnectError(error: unknown): string {
   const message =
     error instanceof Error ? error.message.trim() : typeof error === 'string' ? error.trim() : '';
@@ -21,8 +23,17 @@ export async function connectPaytacaWithGuard(params: {
   connect: () => Promise<void>;
   refetchAddresses?: () => Promise<void>;
   timeoutMs?: number;
-}): Promise<void> {
+}): Promise<string | null> {
   const { connect, refetchAddresses, timeoutMs = 12000 } = params;
+
+  try {
+    const directAddress = await connectPaytacaDirect('testnet');
+    if (directAddress) {
+      return directAddress;
+    }
+  } catch {
+    // Continue with WalletConnect fallback below.
+  }
 
   let timer: number | undefined;
   try {
@@ -43,6 +54,7 @@ export async function connectPaytacaWithGuard(params: {
         }, timeoutMs);
       }),
     ]);
+    return null;
   } catch (error) {
     throw new Error(normalizeWalletConnectError(error));
   } finally {

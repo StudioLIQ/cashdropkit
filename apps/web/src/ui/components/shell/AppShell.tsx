@@ -2,7 +2,12 @@
 
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { setGlobalAdapter, useConnectionStore, useWalletStore } from '@/stores';
+import {
+  setGlobalAdapter,
+  useConnectionStore,
+  useExtensionWalletStore,
+  useWalletStore,
+} from '@/stores';
 import { useWallet } from 'bch-connect';
 
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
@@ -47,11 +52,16 @@ export function AppShell({ children }: AppShellProps) {
   // Wallet state
   const { wallets, activeWalletId, loadWallets, addWatchOnlyWallet, selectWallet } =
     useWalletStore();
+  const {
+    connectedAddress: directWalletAddress,
+    setConnectedAddress,
+    clearConnectedAddress,
+  } = useExtensionWalletStore();
   const activeWallet = wallets.find((w) => w.id === activeWalletId);
   const {
     connect,
     disconnect,
-    isConnected: isExtensionConnected,
+    isConnected: isBchConnectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
@@ -60,7 +70,9 @@ export function AppShell({ children }: AppShellProps) {
   const [isWalletConnecting, setIsWalletConnecting] = useState(false);
   const [walletSyncError, setWalletSyncError] = useState<string | null>(null);
   const [syncingAddress, setSyncingAddress] = useState<string | null>(null);
-  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
+  const effectiveExtensionAddress =
+    directWalletAddress || extensionTokenAddress || extensionAddress;
+  const isExtensionConnected = Boolean(directWalletAddress) || isBchConnectConnected;
   const walletError = walletSyncError || connectError?.message || null;
 
   const syncConnectedWallet = useCallback(
@@ -109,18 +121,22 @@ export function AppShell({ children }: AppShellProps) {
     setWalletSyncError(null);
     try {
       setIsWalletConnecting(true);
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
+      if (directAddress) {
+        setConnectedAddress(directAddress);
+      }
     } catch (err) {
       setWalletSyncError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsWalletConnecting(false);
     }
-  }, [connect, refetchAddresses]);
+  }, [connect, refetchAddresses, setConnectedAddress]);
 
   const handleWalletDisconnect = useCallback(() => {
     setWalletSyncError(null);
+    clearConnectedAddress();
     disconnect();
-  }, [disconnect]);
+  }, [clearConnectedAddress, disconnect]);
 
   // Initialize connection on mount
   useEffect(() => {

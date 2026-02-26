@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { useWalletStore } from '@/stores';
+import { useExtensionWalletStore, useWalletStore } from '@/stores';
 import { useWallet } from 'bch-connect';
 
 import { settingsRepo } from '@/core/db';
@@ -28,14 +28,21 @@ export default function WalletsPage() {
   const {
     connect,
     disconnect,
-    isConnected,
+    isConnected: isBchConnectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
     refetchAddresses,
   } = useWallet();
+  const {
+    connectedAddress: directWalletAddress,
+    setConnectedAddress,
+    clearConnectedAddress,
+  } = useExtensionWalletStore();
 
-  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
+  const effectiveExtensionAddress =
+    directWalletAddress || extensionTokenAddress || extensionAddress;
+  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
 
   const [network, setNetwork] = useState<Network>('testnet');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -76,11 +83,19 @@ export default function WalletsPage() {
   const handleConnect = useCallback(async () => {
     setLocalError(null);
     try {
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
+      if (directAddress) {
+        setConnectedAddress(directAddress);
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     }
-  }, [connect, refetchAddresses]);
+  }, [connect, refetchAddresses, setConnectedAddress]);
+
+  const handleDisconnect = useCallback(() => {
+    clearConnectedAddress();
+    disconnect();
+  }, [clearConnectedAddress, disconnect]);
 
   useEffect(() => {
     if (!isConnected || !effectiveExtensionAddress) return;
@@ -112,7 +127,7 @@ export default function WalletsPage() {
           ) : (
             <button
               type="button"
-              onClick={disconnect}
+              onClick={handleDisconnect}
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Disconnect

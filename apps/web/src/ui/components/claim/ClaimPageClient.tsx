@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
+import { useExtensionWalletStore } from '@/stores';
 import { hashTransaction, hexToBin } from '@bitauth/libauth';
 import { useSignTransaction, useWallet } from 'bch-connect';
 
@@ -43,13 +44,16 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const {
     address: connectedAddress,
     tokenAddress: connectedTokenAddress,
-    isConnected,
+    isConnected: isBchConnectConnected,
     connect,
     connectError,
     refetchAddresses,
   } = useWallet();
+  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
   const { signTransaction } = useSignTransaction();
-  const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
+  const effectiveConnectedAddress =
+    directWalletAddress || connectedTokenAddress || connectedAddress;
+  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
   const beneficiaryAddress = effectiveConnectedAddress || '';
 
   // Filter tranches for the beneficiary
@@ -115,13 +119,16 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const handleConnectWallet = useCallback(async () => {
     try {
       setIsConnecting(true);
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
+      if (directAddress) {
+        setConnectedAddress(directAddress);
+      }
     } catch {
       // connectError from hook is rendered in UI
     } finally {
       setIsConnecting(false);
     }
-  }, [connect, refetchAddresses]);
+  }, [connect, refetchAddresses, setConnectedAddress]);
 
   // ========================================================================
   // Unlock

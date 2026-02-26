@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { useAirdropStore, useWalletStore } from '@/stores';
+import { useAirdropStore, useExtensionWalletStore, useWalletStore } from '@/stores';
 import { useSignTransaction, useWallet } from 'bch-connect';
 
 import type { BatchPlan } from '@/core/db/types';
@@ -48,12 +48,15 @@ export function ExecuteStep() {
   const {
     address: connectedAddress,
     tokenAddress: connectedTokenAddress,
-    isConnected: isExtensionConnected,
+    isConnected: isBchConnectConnected,
     connect: connectExtensionWallet,
     connectError,
     refetchAddresses,
   } = useWallet();
-  const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
+  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
+  const effectiveConnectedAddress =
+    directWalletAddress || connectedTokenAddress || connectedAddress;
+  const isExtensionConnected = Boolean(directWalletAddress) || isBchConnectConnected;
 
   // Local UI state
   const [forceRebuild, setForceRebuild] = useState(false);
@@ -138,10 +141,13 @@ export function ExecuteStep() {
       try {
         if (!isExtensionConnected) {
           setIsConnectingExtension(true);
-          await connectPaytacaWithGuard({
+          const directAddress = await connectPaytacaWithGuard({
             connect: connectExtensionWallet,
             refetchAddresses,
           });
+          if (directAddress) {
+            setConnectedAddress(directAddress);
+          }
         }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
@@ -199,6 +205,7 @@ export function ExecuteStep() {
       isExtensionConnected,
       connectExtensionWallet,
       refetchAddresses,
+      setConnectedAddress,
       signTransaction,
       forceRebuild,
       startExecution,
@@ -211,16 +218,19 @@ export function ExecuteStep() {
     setLocalError(null);
     try {
       setIsConnectingExtension(true);
-      await connectPaytacaWithGuard({
+      const directAddress = await connectPaytacaWithGuard({
         connect: connectExtensionWallet,
         refetchAddresses,
       });
+      if (directAddress) {
+        setConnectedAddress(directAddress);
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsConnectingExtension(false);
     }
-  }, [connectExtensionWallet, refetchAddresses]);
+  }, [connectExtensionWallet, refetchAddresses, setConnectedAddress]);
 
   if (!activeCampaign) return null;
 

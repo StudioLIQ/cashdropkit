@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useAirdropStore, useUtxoStore, useWalletStore } from '@/stores';
+import { useAirdropStore, useExtensionWalletStore, useUtxoStore, useWalletStore } from '@/stores';
 import { useWallet } from 'bch-connect';
 
 import { outpointId } from '@/core/adapters/chain/types';
@@ -17,12 +17,13 @@ export function FundingStep() {
   const { wallets, activeWalletId, addWatchOnlyWallet, selectWallet } = useWalletStore();
   const {
     connect,
-    isConnected,
+    isConnected: isBchConnectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
     refetchAddresses,
   } = useWallet();
+  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
   const {
     isFetching,
     fetchError,
@@ -46,7 +47,9 @@ export function FundingStep() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncingSourceWallet, setIsSyncingSourceWallet] = useState(false);
-  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
+  const effectiveExtensionAddress =
+    directWalletAddress || extensionTokenAddress || extensionAddress;
+  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
 
   // Get current wallet and its primary address
   const currentWallet = useMemo(
@@ -155,13 +158,16 @@ export function FundingStep() {
     setLocalError(null);
     try {
       setIsConnecting(true);
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
+      if (directAddress) {
+        setConnectedAddress(directAddress);
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsConnecting(false);
     }
-  }, [connect, refetchAddresses]);
+  }, [connect, refetchAddresses, setConnectedAddress]);
 
   useEffect(() => {
     const connected = effectiveExtensionAddress?.trim();
