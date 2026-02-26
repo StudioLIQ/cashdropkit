@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, Manrope, Space_Grotesk } from 'next/font/google';
 
 import './globals.css';
@@ -22,11 +22,21 @@ export const metadata: Metadata = {
   title: 'CashDrop Kit',
   description:
     'Local-first web console for CashTokens airdrops and vesting with local signing, chunked execution, pause/resume, and auditable reporting.',
+  manifest: '/site.webmanifest',
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }, { url: '/favicon.ico' }],
-    shortcut: ['/favicon.svg'],
-    apple: [{ url: '/favicon.svg' }],
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+    ],
+    shortcut: ['/favicon.ico'],
+    apple: [{ url: '/apple-touch-icon.png', type: 'image/png', sizes: '180x180' }],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0da37f',
 };
 
 export default function RootLayout({
