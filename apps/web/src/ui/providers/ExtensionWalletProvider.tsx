@@ -3,8 +3,6 @@
 import { BCHConnectProvider, bchConnectModal } from 'bch-connect';
 import type { Configuration, CreatedConfig, ModalFactory } from 'bch-connect';
 
-const PAYTACA_WALLETCONNECT_PROJECT_ID = 'b7c10b6ffc9f3911c913020d9fbb2d51';
-const ZERO_PROJECT_ID = '00000000000000000000000000000000';
 const PAYTACA_EXTENSION_ID = 'pakphhpnneopheifihmjcjnbdbhaaiaa';
 
 const PAYTACA_ONLY_WALLETS = [
@@ -20,11 +18,16 @@ const PAYTACA_ONLY_WALLETS = [
 ] as const;
 
 function getProjectId(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
-  if (!fromEnv || fromEnv === ZERO_PROJECT_ID) {
-    return PAYTACA_WALLETCONNECT_PROJECT_ID;
+  const id = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
+  if (!id) {
+    console.error(
+      '[CashDropKit] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set. ' +
+        'Wallet connect will fail. Create a free project at https://cloud.reown.com ' +
+        'and add the ID to .env.local',
+    );
+    return 'missing-project-id';
   }
-  return fromEnv;
+  return id;
 }
 
 const modalFactory: ModalFactory = ({ sessionType }) =>
@@ -43,9 +46,8 @@ const baseConfig: Configuration = {
     icons: ['https://www.cashdropkit.com/favicon.svg'],
   },
   sessionType: 'Wallet Connect V2',
-  // sign-client-v2-20 (npm alias for @walletconnect/sign-client@2.20.3) does not
-  // resolve correctly under pnpm strict isolation, causing the provider to silently
-  // fail to initialise.  Use the standard (latest) sign-client instead.
+  // sign-client-v2-20 (npm alias) fails to resolve under pnpm strict isolation.
+  // The standard @walletconnect/sign-client works correctly.
   supportLegacyClient: false,
   debug: process.env.NODE_ENV === 'development',
 };

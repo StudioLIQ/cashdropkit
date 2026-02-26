@@ -33,8 +33,7 @@ export function useWallet(_network: Network = 'testnet') {
   }, [effectiveAddress, setConnectedAddress, clearConnectedAddress]);
 
   const connect = useCallback(async () => {
-    // If there's already a provider-level init error, surface it immediately
-    // so the user sees a meaningful message instead of a silent no-op.
+    // Surface any provider-level init error immediately instead of silent no-op.
     if (wallet.connectError) {
       throw wallet.connectError;
     }
@@ -46,24 +45,28 @@ export function useWallet(_network: Network = 'testnet') {
         error instanceof Error ? error.message : typeof error === 'string' ? error : '';
       const lowered = message.toLowerCase();
 
+      if (lowered.includes('origin not allowed') || lowered.includes('unauthorized')) {
+        throw new Error(
+          'WalletConnect relay rejected this origin. Set a valid NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env.local (create one free at https://cloud.reown.com).'
+        );
+      }
       if (
         lowered.includes('fatal socket error') ||
         lowered.includes('transport') ||
         lowered.includes('interrupted while trying to subscribe')
       ) {
         throw new Error(
-          'Unable to reach the Paytaca relay. Retry after opening Paytaca extension and approving the pairing request.'
+          'Unable to reach the wallet relay. Check NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID and retry.'
         );
       }
       throw error;
     }
 
-    // bch-connect's connect() silently returns when the internal signClient
-    // or modal is not yet initialised.  Detect this and throw so callers
-    // (connectGuard / AppShell) can show a proper error.
+    // bch-connect's connect() silently returns when signClient or modal
+    // is not initialised.  Detect this and throw.
     if (!wallet.isConnected && !wallet.session) {
       throw new Error(
-        'Wallet relay is still initialising. Wait a moment and try again.'
+        'Wallet provider failed to initialise. Check browser console for errors.'
       );
     }
   }, [wallet]);

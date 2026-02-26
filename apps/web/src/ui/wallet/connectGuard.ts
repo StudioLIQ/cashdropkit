@@ -5,14 +5,20 @@ function normalizeConnectError(error: unknown): string {
     error instanceof Error ? error.message.trim() : typeof error === 'string' ? error.trim() : '';
 
   const lowered = message.toLowerCase();
+  if (lowered.includes('origin not allowed') || lowered.includes('unauthorized')) {
+    return 'WalletConnect project ID does not allow this origin. Create your own project at https://cloud.reown.com and set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env.local.';
+  }
   if (lowered.includes('fatal socket error') || lowered.includes('transport')) {
-    return 'Unable to reach the wallet relay. Please try again in a few seconds.';
+    return 'Unable to reach the wallet relay. Check your WalletConnect project ID and try again.';
   }
   if (lowered.includes('interrupted while trying to subscribe')) {
     return 'Wallet relay connection was interrupted. Retry once after re-opening the Paytaca extension.';
   }
-  if (lowered.includes('project not found')) {
-    return 'Wallet relay project configuration is invalid. Reload the app and try connecting again.';
+  if (lowered.includes('project not found') || lowered.includes('walletconnect_project_id')) {
+    return 'WalletConnect project ID is missing or invalid. Create one at https://cloud.reown.com and add to .env.local.';
+  }
+  if (lowered.includes('failed to initialise') || lowered.includes('failed to initialize')) {
+    return 'Wallet provider failed to start. Check browser console for details.';
   }
   if (lowered.includes('reject') || lowered.includes('declin')) {
     return 'Connection request was rejected in Paytaca.';
