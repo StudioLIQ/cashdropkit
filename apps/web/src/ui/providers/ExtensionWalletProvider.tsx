@@ -37,8 +37,3 @@ export function ExtensionWalletProvider({
 }>) {
   return <BCHConnectProvider config={config}>{children}</BCHConnectProvider>;
 }
-
-export function hasWalletConnectProjectIdConfigured(): boolean {
-  const configured = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
-  return Boolean(configured);
-}

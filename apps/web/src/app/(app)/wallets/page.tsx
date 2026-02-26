@@ -9,7 +9,6 @@ import { settingsRepo } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { WalletListCard } from '@/ui/components/wallet';
-import { hasWalletConnectProjectIdConfigured } from '@/ui/providers/ExtensionWalletProvider';
 
 export default function WalletsPage() {
   const {
@@ -40,8 +39,6 @@ export default function WalletsPage() {
   const [network, setNetwork] = useState<Network>('testnet');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  const extensionConfigured = hasWalletConnectProjectIdConfigured();
 
   useEffect(() => {
     loadWallets();
@@ -123,16 +120,6 @@ export default function WalletsPage() {
           )}
         </div>
       </div>
-
-      {!extensionConfigured && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          <p className="font-medium">WalletConnect Project ID is not configured</p>
-          <p className="mt-1">
-            Set <code>NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</code> in env for stable extension
-            connection.
-          </p>
-        </div>
-      )}
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -236,8 +223,7 @@ export default function WalletsPage() {
             Use extension wallet connection and keep seed in wallet app only.
           </p>
           <p className="mt-2">
-            Recommended extensions for BCH dApp signing: <strong>Paytaca</strong> first, then{' '}
-            <strong>Cashonize</strong> as fallback.
+            Supported extension wallet: <strong>Paytaca Wallet</strong>.
           </p>
         </div>
       </div>
