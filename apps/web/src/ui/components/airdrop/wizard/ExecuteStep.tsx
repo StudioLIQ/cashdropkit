@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAirdropStore, useExtensionWalletStore, useWalletStore } from '@/stores';
-import { useSignTransaction, useWallet } from 'bch-connect';
 
 import type { BatchPlan } from '@/core/db/types';
 import type { AddressDerivation } from '@/core/signer';
 import { createWalletConnectSigner } from '@/core/signer';
 
 import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+import { useSignTransaction, useWallet } from '@/ui/wallet/usePaytacaWallet';
 
 import { BatchDetailModal } from './BatchDetailModal';
 
@@ -48,15 +48,15 @@ export function ExecuteStep() {
   const {
     address: connectedAddress,
     tokenAddress: connectedTokenAddress,
-    isConnected: isBchConnectConnected,
+    isConnected: isDirectConnected,
     connect: connectExtensionWallet,
     connectError,
     refetchAddresses,
   } = useWallet();
-  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
+  const { connectedAddress: directWalletAddress } = useExtensionWalletStore();
   const effectiveConnectedAddress =
     directWalletAddress || connectedTokenAddress || connectedAddress;
-  const isExtensionConnected = Boolean(directWalletAddress) || isBchConnectConnected;
+  const isExtensionConnected = Boolean(directWalletAddress) || isDirectConnected;
 
   // Local UI state
   const [forceRebuild, setForceRebuild] = useState(false);
@@ -141,13 +141,10 @@ export function ExecuteStep() {
       try {
         if (!isExtensionConnected) {
           setIsConnectingExtension(true);
-          const directAddress = await connectPaytacaWithGuard({
+          await connectPaytacaWithGuard({
             connect: connectExtensionWallet,
             refetchAddresses,
           });
-          if (directAddress) {
-            setConnectedAddress(directAddress);
-          }
         }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
@@ -205,7 +202,6 @@ export function ExecuteStep() {
       isExtensionConnected,
       connectExtensionWallet,
       refetchAddresses,
-      setConnectedAddress,
       signTransaction,
       forceRebuild,
       startExecution,
@@ -218,19 +214,16 @@ export function ExecuteStep() {
     setLocalError(null);
     try {
       setIsConnectingExtension(true);
-      const directAddress = await connectPaytacaWithGuard({
+      await connectPaytacaWithGuard({
         connect: connectExtensionWallet,
         refetchAddresses,
       });
-      if (directAddress) {
-        setConnectedAddress(directAddress);
-      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsConnectingExtension(false);
     }
-  }, [connectExtensionWallet, refetchAddresses, setConnectedAddress]);
+  }, [connectExtensionWallet, refetchAddresses]);
 
   if (!activeCampaign) return null;
 
@@ -433,8 +426,8 @@ export function ExecuteStep() {
           Extension wallet signing is required
         </p>
         <p className="mt-1 text-xs text-blue-700 dark:text-blue-400">
-          CashDrop now signs via connected BCH wallet extension (WalletConnect). Recovery phrase
-          input is not used here.
+          CashDrop now signs via connected Paytaca extension wallet. Recovery phrase input is not
+          used here.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <button

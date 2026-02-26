@@ -80,7 +80,7 @@ export interface UnlockParams {
 
 /**
  * Parameters for building an unlock transaction payload that can be signed by
- * an external wallet (e.g. browser extension via WalletConnect).
+ * an external wallet (e.g. browser extension provider).
  */
 export interface UnlockExternalSigningParams {
   tranche: ClaimTranche;

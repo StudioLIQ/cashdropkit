@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAirdropStore, useExtensionWalletStore, useUtxoStore, useWalletStore } from '@/stores';
-import { useWallet } from 'bch-connect';
 
 import { outpointId } from '@/core/adapters/chain/types';
 import type { Outpoint } from '@/core/adapters/chain/types';
@@ -11,19 +10,20 @@ import { quickEstimate } from '@/core/planner';
 import { formatBchAmount, formatTokenAmount } from '@/core/utxo';
 
 import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/usePaytacaWallet';
 
 export function FundingStep() {
   const { activeCampaign, updateCampaignFunding } = useAirdropStore();
   const { wallets, activeWalletId, addWatchOnlyWallet, selectWallet } = useWalletStore();
   const {
     connect,
-    isConnected: isBchConnectConnected,
+    isConnected: isDirectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
     refetchAddresses,
   } = useWallet();
-  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
+  const { connectedAddress: directWalletAddress } = useExtensionWalletStore();
   const {
     isFetching,
     fetchError,
@@ -49,7 +49,7 @@ export function FundingStep() {
   const [isSyncingSourceWallet, setIsSyncingSourceWallet] = useState(false);
   const effectiveExtensionAddress =
     directWalletAddress || extensionTokenAddress || extensionAddress;
-  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
+  const isConnected = Boolean(directWalletAddress) || isDirectConnected;
 
   // Get current wallet and its primary address
   const currentWallet = useMemo(
@@ -158,16 +158,13 @@ export function FundingStep() {
     setLocalError(null);
     try {
       setIsConnecting(true);
-      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
-      if (directAddress) {
-        setConnectedAddress(directAddress);
-      }
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsConnecting(false);
     }
-  }, [connect, refetchAddresses, setConnectedAddress]);
+  }, [connect, refetchAddresses]);
 
   useEffect(() => {
     const connected = effectiveExtensionAddress?.trim();

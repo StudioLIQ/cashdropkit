@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useExtensionWalletStore, useWalletStore } from '@/stores';
-import { useWallet } from 'bch-connect';
 
 import { settingsRepo } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { WalletListCard } from '@/ui/components/wallet';
 import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/usePaytacaWallet';
 
 export default function WalletsPage() {
   const {
@@ -28,21 +28,18 @@ export default function WalletsPage() {
   const {
     connect,
     disconnect,
-    isConnected: isBchConnectConnected,
+    isConnected: isDirectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
     refetchAddresses,
   } = useWallet();
-  const {
-    connectedAddress: directWalletAddress,
-    setConnectedAddress,
-    clearConnectedAddress,
-  } = useExtensionWalletStore();
+  const { connectedAddress: directWalletAddress, clearConnectedAddress } =
+    useExtensionWalletStore();
 
   const effectiveExtensionAddress =
     directWalletAddress || extensionTokenAddress || extensionAddress;
-  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
+  const isConnected = Boolean(directWalletAddress) || isDirectConnected;
 
   const [network, setNetwork] = useState<Network>('testnet');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -83,14 +80,11 @@ export default function WalletsPage() {
   const handleConnect = useCallback(async () => {
     setLocalError(null);
     try {
-      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
-      if (directAddress) {
-        setConnectedAddress(directAddress);
-      }
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     }
-  }, [connect, refetchAddresses, setConnectedAddress]);
+  }, [connect, refetchAddresses]);
 
   const handleDisconnect = useCallback(() => {
     clearConnectedAddress();

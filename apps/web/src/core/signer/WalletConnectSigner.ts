@@ -1,16 +1,19 @@
 /**
- * WalletConnect Signer
+ * Extension Wallet Signer
  *
- * Uses BCH extension wallets (via bch-connect / WalletConnect v2)
- * to sign prepared unsigned transactions.
+ * Uses browser wallet hooks to sign prepared unsigned transactions.
  */
 import { hashTransaction, hexToBin } from '@bitauth/libauth';
-import type { WcSignTransactionResponse } from 'bch-connect';
 
 import type { UnsignedTransaction } from '@/core/tx/tokenTxBuilder';
 import { hexToBytes } from '@/core/tx/tokenTxBuilder';
 
 import type { AddressDerivation, MnemonicSigner, SigningResult } from './Signer';
+
+interface WcSignTransactionResponse {
+  signedTransaction: string;
+  signedTransactionHash: string;
+}
 
 const DEFAULT_SEQUENCE = 0xfffffffe;
 
@@ -149,8 +152,12 @@ export class WalletConnectSigner implements MnemonicSigner {
     this.signWithWallet = signWithWallet;
   }
 
-  async sign(tx: UnsignedTransaction, _addressDerivations: AddressDerivation[]): Promise<SigningResult> {
+  async sign(
+    tx: UnsignedTransaction,
+    addressDerivations: AddressDerivation[]
+  ): Promise<SigningResult> {
     try {
+      void addressDerivations;
       const unsignedHex = serializeUnsignedTransaction(tx);
       const response = await this.signWithWallet({
         txRequest: {
@@ -196,7 +203,7 @@ export class WalletConnectSigner implements MnemonicSigner {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'WalletConnect signing failed',
+        error: error instanceof Error ? error.message : 'Extension wallet signing failed',
       };
     }
   }

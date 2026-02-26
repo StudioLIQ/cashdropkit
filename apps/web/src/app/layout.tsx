@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, Manrope, Space_Grotesk } from 'next/font/google';
 
-import { ExtensionWalletProvider } from '@/ui/providers/ExtensionWalletProvider';
-
 import './globals.css';
 
 const manrope = Manrope({
@@ -51,7 +49,7 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <ExtensionWalletProvider>{children}</ExtensionWalletProvider>
+        {children}
       </body>
     </html>
   );

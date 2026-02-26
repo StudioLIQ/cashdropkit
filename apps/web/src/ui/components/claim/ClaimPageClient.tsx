@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { useExtensionWalletStore } from '@/stores';
 import { hashTransaction, hexToBin } from '@bitauth/libauth';
-import { useSignTransaction, useWallet } from 'bch-connect';
 
 import type { Network } from '@/core/db/types';
 import type { ClaimBundle, ClaimTranche, UnlockResult } from '@/core/tx/unlockTxBuilder';
@@ -16,6 +15,7 @@ import {
 } from '@/core/tx/unlockTxBuilder';
 
 import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+import { useSignTransaction, useWallet } from '@/ui/wallet/usePaytacaWallet';
 
 // ============================================================================
 // Types
@@ -44,16 +44,16 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const {
     address: connectedAddress,
     tokenAddress: connectedTokenAddress,
-    isConnected: isBchConnectConnected,
+    isConnected: isDirectConnected,
     connect,
     connectError,
     refetchAddresses,
   } = useWallet();
-  const { connectedAddress: directWalletAddress, setConnectedAddress } = useExtensionWalletStore();
+  const { connectedAddress: directWalletAddress } = useExtensionWalletStore();
   const { signTransaction } = useSignTransaction();
   const effectiveConnectedAddress =
     directWalletAddress || connectedTokenAddress || connectedAddress;
-  const isConnected = Boolean(directWalletAddress) || isBchConnectConnected;
+  const isConnected = Boolean(directWalletAddress) || isDirectConnected;
   const beneficiaryAddress = effectiveConnectedAddress || '';
 
   // Filter tranches for the beneficiary
@@ -119,16 +119,13 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const handleConnectWallet = useCallback(async () => {
     try {
       setIsConnecting(true);
-      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
-      if (directAddress) {
-        setConnectedAddress(directAddress);
-      }
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch {
       // connectError from hook is rendered in UI
     } finally {
       setIsConnecting(false);
     }
-  }, [connect, refetchAddresses, setConnectedAddress]);
+  }, [connect, refetchAddresses]);
 
   // ========================================================================
   // Unlock

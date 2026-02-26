@@ -8,7 +8,6 @@ import {
   useExtensionWalletStore,
   useWalletStore,
 } from '@/stores';
-import { useWallet } from 'bch-connect';
 
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
 import { initApiClient } from '@/core/db';
@@ -16,6 +15,7 @@ import type { Network } from '@/core/db/types';
 
 import { ToastContainer } from '@/ui/components/toasts/ToastContainer';
 import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/usePaytacaWallet';
 
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -52,16 +52,12 @@ export function AppShell({ children }: AppShellProps) {
   // Wallet state
   const { wallets, activeWalletId, loadWallets, addWatchOnlyWallet, selectWallet } =
     useWalletStore();
-  const {
-    connectedAddress: directWalletAddress,
-    setConnectedAddress,
-    clearConnectedAddress,
-  } = useExtensionWalletStore();
+  const { connectedAddress: directWalletAddress } = useExtensionWalletStore();
   const activeWallet = wallets.find((w) => w.id === activeWalletId);
   const {
     connect,
     disconnect,
-    isConnected: isBchConnectConnected,
+    isConnected: isDirectConnected,
     address: extensionAddress,
     tokenAddress: extensionTokenAddress,
     connectError,
@@ -72,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
   const [syncingAddress, setSyncingAddress] = useState<string | null>(null);
   const effectiveExtensionAddress =
     directWalletAddress || extensionTokenAddress || extensionAddress;
-  const isExtensionConnected = Boolean(directWalletAddress) || isBchConnectConnected;
+  const isExtensionConnected = Boolean(directWalletAddress) || isDirectConnected;
   const walletError = walletSyncError || connectError?.message || null;
 
   const syncConnectedWallet = useCallback(
@@ -121,22 +117,18 @@ export function AppShell({ children }: AppShellProps) {
     setWalletSyncError(null);
     try {
       setIsWalletConnecting(true);
-      const directAddress = await connectPaytacaWithGuard({ connect, refetchAddresses });
-      if (directAddress) {
-        setConnectedAddress(directAddress);
-      }
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setWalletSyncError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsWalletConnecting(false);
     }
-  }, [connect, refetchAddresses, setConnectedAddress]);
+  }, [connect, refetchAddresses]);
 
   const handleWalletDisconnect = useCallback(() => {
     setWalletSyncError(null);
-    clearConnectedAddress();
     disconnect();
-  }, [clearConnectedAddress, disconnect]);
+  }, [disconnect]);
 
   // Initialize connection on mount
   useEffect(() => {
