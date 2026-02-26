@@ -1,21 +1,12 @@
 'use client';
 
-import { BCHConnectProvider, bchConnectModal } from 'bch-connect';
-import type { Configuration, CreatedConfig, ModalFactory } from 'bch-connect';
+import { BCHConnectProvider } from 'bch-connect';
+import type { Configuration, CreatedConfig } from 'bch-connect';
 
-const PAYTACA_EXTENSION_ID = 'pakphhpnneopheifihmjcjnbdbhaaiaa';
-
-const PAYTACA_ONLY_WALLETS = [
-  {
-    id: 'paytaca',
-    name: 'Paytaca',
-    iconUrl: 'https://www.paytaca.com/favicon.png',
-    links: {
-      native: 'paytaca://apps/wallet-connect?uri={{uri}}',
-      fallback: `chrome-extension://${PAYTACA_EXTENSION_ID}/www/index.html#/apps/wallet-connect?uri={{uri}}`,
-    },
-  },
-] as const;
+import {
+  PaytacaConnectModal,
+  createPaytacaModalBridge,
+} from '@/ui/wallet/PaytacaConnectModal';
 
 function getProjectId(): string {
   const id = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
@@ -29,12 +20,6 @@ function getProjectId(): string {
   }
   return id;
 }
-
-const modalFactory: ModalFactory = ({ sessionType }) =>
-  bchConnectModal({
-    sessionType,
-    wallets: [...PAYTACA_ONLY_WALLETS],
-  });
 
 const baseConfig: Configuration = {
   projectId: getProjectId(),
@@ -52,13 +37,22 @@ const baseConfig: Configuration = {
   debug: process.env.NODE_ENV === 'development',
 };
 
+// Custom modal that shows a prominent "Open in Paytaca Extension" button
+// when the extension is detected, with a QR code fallback below.
+const modal = createPaytacaModalBridge();
+
 // Avoid createConfig(): it eagerly creates modal internals and can touch `document` during SSR.
-const config = { ...baseConfig, modal: modalFactory } as CreatedConfig;
+const config = { ...baseConfig, modal } as CreatedConfig;
 
 export function ExtensionWalletProvider({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <BCHConnectProvider config={config}>{children}</BCHConnectProvider>;
+  return (
+    <BCHConnectProvider config={config}>
+      {children}
+      <PaytacaConnectModal />
+    </BCHConnectProvider>
+  );
 }
