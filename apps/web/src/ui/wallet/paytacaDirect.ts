@@ -25,10 +25,50 @@ interface PaytacaProvider {
   >;
 }
 
+const PAYTACA_EXTENSION_ID = 'pakphhpnneopheifihmjcjnbdbhaaiaa';
+
 declare global {
   interface Window {
     paytaca?: PaytacaProvider;
     Paytaca?: PaytacaProvider;
+  }
+}
+
+function isPaytacaProvider(
+  provider: PaytacaProvider | null | undefined
+): provider is PaytacaProvider {
+  return Boolean(
+    provider &&
+      (provider.connect ||
+        provider.enable ||
+        provider.request ||
+        provider.getAddress ||
+        provider.getAddresses)
+  );
+}
+
+function pickProvider(value: unknown): PaytacaProvider | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as PaytacaProvider;
+  if (isPaytacaProvider(candidate)) return candidate;
+
+  const nested = value as Record<string, unknown>;
+  const nestedKeys = ['provider', 'paytaca', 'wallet', 'bch', 'bitcoincash', 'bitcoin'];
+  for (const key of nestedKeys) {
+    const nestedCandidate = nested[key] as PaytacaProvider | undefined;
+    if (isPaytacaProvider(nestedCandidate)) {
+      return nestedCandidate;
+    }
+  }
+
+  return null;
+}
+
+function safeReadWindowProperty(name: string): unknown {
+  try {
+    return (window as unknown as Record<string, unknown>)[name];
+  } catch {
+    return undefined;
   }
 }
 
@@ -43,17 +83,7 @@ function normalizeToNetwork(address: string, network: Network): string {
 
 export function getPaytacaProvider(): PaytacaProvider | null {
   if (typeof window === 'undefined') return null;
-  const isProvider = (provider: PaytacaProvider | null | undefined): provider is PaytacaProvider =>
-    Boolean(
-      provider &&
-        (provider.connect ||
-          provider.enable ||
-          provider.request ||
-          provider.getAddress ||
-          provider.getAddresses)
-    );
-
-  const namedCandidates: PaytacaProvider[] = [
+  const namedCandidates: unknown[] = [
     window.paytaca as PaytacaProvider,
     window.Paytaca as PaytacaProvider,
     (window as { bitcoincash?: PaytacaProvider }).bitcoincash as PaytacaProvider,
@@ -63,22 +93,28 @@ export function getPaytacaProvider(): PaytacaProvider | null {
     (window as { paytacaWallet?: PaytacaProvider }).paytacaWallet as PaytacaProvider,
     (window as { paytacaProvider?: PaytacaProvider }).paytacaProvider as PaytacaProvider,
     (window as { paytaca?: { provider?: PaytacaProvider } }).paytaca?.provider as PaytacaProvider,
-  ].filter(Boolean);
+  ];
 
-  for (const provider of namedCandidates) {
-    if (isProvider(provider)) {
+  for (const value of namedCandidates) {
+    const provider = pickProvider(value);
+    if (provider) {
       return provider;
     }
   }
 
-  // Last-resort scan for injected providers with compatible methods.
-  const dynamicCandidate = Object.values(window).find((value) => {
-    if (!value || typeof value !== 'object') return false;
-    const candidate = value as PaytacaProvider;
-    return isProvider(candidate);
-  }) as PaytacaProvider | undefined;
+  const seen = new Set<unknown>(namedCandidates);
+  const windowKeys = Object.getOwnPropertyNames(window);
+  for (const key of windowKeys) {
+    const value = safeReadWindowProperty(key);
+    if (seen.has(value)) continue;
+    seen.add(value);
+    const provider = pickProvider(value);
+    if (provider) {
+      return provider;
+    }
+  }
 
-  return dynamicCandidate ?? null;
+  return null;
 }
 
 export async function waitForPaytacaProvider(timeoutMs = 2500): Promise<PaytacaProvider | null> {
@@ -91,9 +127,43 @@ export async function waitForPaytacaProvider(timeoutMs = 2500): Promise<PaytacaP
   return provider;
 }
 
+function isChromiumBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /(Chrome|Chromium|Edg|Brave)/i.test(ua);
+}
+
+export async function isPaytacaExtensionInstalled(timeoutMs = 1200): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  if (!isChromiumBrowser()) return false;
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`chrome-extension://${PAYTACA_EXTENSION_ID}/manifest.json`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function connectPaytacaDirect(network: Network = 'testnet'): Promise<string | null> {
   const provider = await waitForPaytacaProvider();
-  if (!provider) return null;
+  if (!provider) {
+    const extensionInstalled = await isPaytacaExtensionInstalled();
+    if (extensionInstalled) {
+      throw new Error(
+        'Paytaca extension is installed, but no dApp provider API was exposed to this tab. Reload the page and reopen the extension once, then retry.'
+      );
+    }
+    return null;
+  }
 
   let response: PaytacaConnectResult | string | string[] | undefined;
   if (provider.connect) {
