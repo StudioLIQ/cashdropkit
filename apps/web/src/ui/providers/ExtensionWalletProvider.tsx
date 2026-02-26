@@ -33,7 +33,7 @@ const baseConfig: Configuration = {
     icons: ['https://www.cashdropkit.com/favicon.svg'],
   },
   sessionType: 'Wallet Connect V2',
-  supportLegacyClient: true,
+  supportLegacyClient: false,
   debug: false,
 };
 
