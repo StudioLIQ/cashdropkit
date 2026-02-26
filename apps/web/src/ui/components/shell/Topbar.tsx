@@ -41,8 +41,10 @@ function ConnectionIndicator({
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         disabled={!canRetry}
-        className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors ${
-          canRetry ? 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800' : 'cursor-default'
+        className={`cdk-pill flex items-center gap-2 px-2.5 py-1.5 text-sm transition-colors ${
+          canRetry
+            ? 'cursor-pointer hover:border-emerald-400/40 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30'
+            : 'cursor-default'
         }`}
         title={canRetry ? 'Click to retry connection' : undefined}
       >
@@ -73,7 +75,7 @@ function ConnectionIndicator({
 
       {/* Tooltip with error details */}
       {showTooltip && lastError && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-lg border border-zinc-200 bg-white p-3 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="cdk-panel absolute left-0 top-full z-30 mt-2 w-64 rounded-xl p-3 text-sm">
           <div className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">Connection Error</div>
           <div className="text-zinc-500 dark:text-zinc-400">{lastError}</div>
           {canRetry && (
@@ -99,7 +101,7 @@ function NetworkSelector({
       value={network}
       onChange={(e) => onChange(e.target.value as Network)}
       disabled={disabled}
-      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+      className="cdk-pill rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200"
     >
       <option value="testnet">Testnet (Chipnet)</option>
     </select>
@@ -118,8 +120,8 @@ export function Topbar({
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex items-center gap-4">
+    <header className="cdk-topbar flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+      <div className="flex flex-wrap items-center gap-2 md:gap-3">
         <NetworkSelector
           network={network}
           onChange={onNetworkChange || (() => {})}
@@ -133,11 +135,11 @@ export function Topbar({
         />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-3">
         {walletLabel && (
           <Link
             href="/wallets"
-            className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="cdk-pill hidden items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-700 hover:border-cyan-400/45 hover:bg-cyan-50/60 dark:text-zinc-200 dark:hover:bg-cyan-950/30 md:flex"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -154,7 +156,7 @@ export function Topbar({
         <div className="relative">
           <button
             onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition-transform hover:scale-[1.02] hover:from-emerald-400 hover:to-cyan-400"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -170,10 +172,10 @@ export function Topbar({
           {isCreateMenuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setIsCreateMenuOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="cdk-panel absolute right-0 top-full z-20 mt-2 w-52 rounded-xl py-1.5">
                 <Link
                   href="/airdrops/new"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-emerald-50/70 dark:text-zinc-300 dark:hover:bg-emerald-950/30"
                   onClick={() => setIsCreateMenuOpen(false)}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,7 +190,7 @@ export function Topbar({
                 </Link>
                 <Link
                   href="/vesting/new"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-cyan-50/70 dark:text-zinc-300 dark:hover:bg-cyan-950/30"
                   onClick={() => setIsCreateMenuOpen(false)}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

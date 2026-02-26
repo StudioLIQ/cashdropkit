@@ -128,9 +128,11 @@ export function AppShell({ children }: AppShellProps) {
   }, [setChecking]);
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-900">
+    <div className="cdk-shell-bg flex h-screen overflow-hidden">
+      <div className="cdk-orb cdk-orb-1" />
+      <div className="cdk-orb cdk-orb-2" />
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar
           network={network}
           connectionStatus={status}
@@ -140,7 +142,9 @@ export function AppShell({ children }: AppShellProps) {
           onNetworkChange={handleNetworkChange}
           onRetry={handleRetry}
         />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto px-4 pb-6 pt-4 md:px-6 md:pb-8 md:pt-5">
+          <div className="cdk-fade-in">{children}</div>
+        </main>
       </div>
       <ToastContainer />
     </div>

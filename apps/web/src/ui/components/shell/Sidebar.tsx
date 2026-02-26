@@ -83,10 +83,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex h-16 items-center border-b border-zinc-200 px-6 dark:border-zinc-800">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+    <aside className="cdk-panel flex h-full w-20 shrink-0 flex-col border-r md:w-72">
+      <div className="flex h-20 items-center border-b border-zinc-200/65 px-4 dark:border-zinc-800/70 md:px-6">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/25">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -96,36 +96,44 @@ export function Sidebar() {
               />
             </svg>
           </div>
-          <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="cdk-brand-title hidden text-lg font-semibold text-zinc-900 dark:text-zinc-100 md:inline">
             CashDrop Kit
           </span>
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <div className="px-4 pt-4 md:px-6">
+        <div className="hidden rounded-full border border-emerald-300/70 bg-emerald-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-900/25 dark:text-emerald-300 md:inline-block">
+          Hackathon Build
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1.5 px-2 py-4 md:px-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                  : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+              className={`cdk-nav-link flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold md:justify-start md:gap-3 ${
+                isActive ? 'cdk-nav-link-active' : ''
               }`}
             >
-              <NavIcon name={item.icon} />
-              {item.label}
+              <span className="shrink-0">
+                <NavIcon name={item.icon} />
+              </span>
+              <span className="hidden md:inline">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
-        <div className="rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
-          <div className="font-medium">Local-first</div>
-          <div>Keys never leave your device</div>
+      <div className="border-t border-zinc-200/60 p-3 dark:border-zinc-800/70 md:p-4">
+        <div className="cdk-panel-soft rounded-xl px-3 py-2 text-center text-[11px] text-zinc-600 dark:text-zinc-400 md:text-left md:text-xs">
+          <div className="font-semibold uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-300">
+            Local-first
+          </div>
+          <div className="mt-1 hidden md:block">Keys never leave your device</div>
         </div>
       </div>
     </aside>

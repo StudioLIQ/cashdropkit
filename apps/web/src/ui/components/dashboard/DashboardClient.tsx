@@ -106,28 +106,35 @@ export function DashboardClient() {
 
   if (stats.isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-sm text-zinc-500 dark:text-zinc-400">Loading dashboard...</div>
+      <div className="cdk-panel flex items-center justify-center rounded-2xl py-20">
+        <div className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          Loading dashboard...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Overview of your airdrop and vesting campaigns
+      <div className="cdk-panel rounded-2xl px-5 py-5 md:px-7 md:py-6">
+        <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/60 bg-cyan-100/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:border-cyan-400/35 dark:bg-cyan-900/20 dark:text-cyan-300">
+          Command Center
+        </div>
+        <h1 className="cdk-brand-title cdk-value text-3xl font-bold text-zinc-900 dark:text-zinc-100 md:text-4xl">
+          CashDrop <span className="cdk-accent">Operations</span>
+        </h1>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Real-time overview for campaign throughput, unlock progress, and operational health.
         </p>
       </div>
 
       {/* Active Wallet Summary */}
       {stats.activeWallet && (
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="cdk-panel rounded-2xl p-4 md:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-white shadow-md shadow-emerald-500/25">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -138,7 +145,7 @@ export function DashboardClient() {
                 </svg>
               </div>
               <div>
-                <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                   {stats.activeWallet.name}
                 </div>
                 <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -148,7 +155,7 @@ export function DashboardClient() {
             </div>
             <Link
               href="/wallets"
-              className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+              className="rounded-full border border-emerald-300/65 bg-emerald-100/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700 hover:bg-emerald-200/80 dark:border-emerald-500/35 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
             >
               Manage
             </Link>
@@ -157,14 +164,14 @@ export function DashboardClient() {
       )}
 
       {!stats.activeWallet && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+        <div className="rounded-2xl border border-amber-300/60 bg-gradient-to-r from-amber-100/95 to-orange-100/75 p-4 shadow-sm dark:border-amber-500/35 dark:from-amber-900/30 dark:to-orange-900/15">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-amber-700 dark:text-amber-400">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
               No wallet configured. Create or import one to get started.
             </p>
             <Link
               href="/wallets"
-              className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-full bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700"
             >
               Setup Wallet
             </Link>
@@ -209,11 +216,15 @@ export function DashboardClient() {
       </div>
 
       {/* Recent Activity */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="cdk-panel rounded-2xl p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Recent Activity</h2>
+          <h2 className="cdk-brand-title text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Recent Activity
+          </h2>
           {stats.recentLogs.length > 0 && (
-            <span className="text-xs text-zinc-400">{stats.recentLogs.length} entries</span>
+            <span className="rounded-full border border-zinc-300/65 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              {stats.recentLogs.length} entries
+            </span>
           )}
         </div>
 
@@ -236,9 +247,9 @@ export function DashboardClient() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
           href="/airdrops"
-          className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-emerald-300 hover:bg-emerald-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-800 dark:hover:bg-emerald-950"
+          className="cdk-panel group flex items-center gap-3 rounded-2xl p-4 transition-transform hover:-translate-y-0.5"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-400 text-white shadow-md shadow-emerald-500/25">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -249,7 +260,7 @@ export function DashboardClient() {
             </svg>
           </div>
           <div>
-            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               Airdrop Campaigns
             </div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -261,9 +272,9 @@ export function DashboardClient() {
 
         <Link
           href="/vesting"
-          className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-purple-300 hover:bg-purple-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-purple-800 dark:hover:bg-purple-950"
+          className="cdk-panel group flex items-center gap-3 rounded-2xl p-4 transition-transform hover:-translate-y-0.5"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/25">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
@@ -274,7 +285,7 @@ export function DashboardClient() {
             </svg>
           </div>
           <div>
-            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               Vesting Campaigns
             </div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -304,17 +315,28 @@ function SummaryCard({
   color: 'emerald' | 'amber' | 'blue' | 'purple' | 'red';
 }) {
   const colorStyles = {
-    emerald: 'text-emerald-600 dark:text-emerald-400',
-    amber: 'text-amber-600 dark:text-amber-400',
-    blue: 'text-blue-600 dark:text-blue-400',
-    purple: 'text-purple-600 dark:text-purple-400',
-    red: 'text-red-600 dark:text-red-400',
+    emerald: 'text-emerald-700 dark:text-emerald-300',
+    amber: 'text-amber-700 dark:text-amber-300',
+    blue: 'text-blue-700 dark:text-blue-300',
+    purple: 'text-cyan-700 dark:text-cyan-300',
+    red: 'text-red-700 dark:text-red-300',
+  };
+
+  const topAccent = {
+    emerald: 'from-emerald-500 to-emerald-300',
+    amber: 'from-amber-500 to-orange-300',
+    blue: 'from-blue-500 to-cyan-300',
+    purple: 'from-cyan-500 to-blue-300',
+    red: 'from-red-500 to-rose-300',
   };
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="cdk-panel relative overflow-hidden rounded-2xl p-6">
+      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${topAccent[color]}`} />
       <div className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</div>
-      <div className="mt-2 text-3xl font-semibold text-zinc-900 dark:text-zinc-100">{value}</div>
+      <div className="cdk-value mt-2 text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+        {value}
+      </div>
       {detail && <div className={`mt-1 text-xs ${colorStyles[color]}`}>{detail}</div>}
     </div>
   );
@@ -338,9 +360,9 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
   const timeStr = new Date(entry.timestamp).toLocaleTimeString();
 
   return (
-    <div className="flex items-start gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+    <div className="flex items-start gap-3 rounded-xl px-2.5 py-2 text-sm transition-colors hover:bg-zinc-100/70 dark:hover:bg-zinc-900/60">
       <span
-        className={`mt-0.5 rounded px-1.5 py-0.5 text-xs font-medium ${levelBadges[entry.level]} ${levelColors[entry.level]}`}
+        className={`mt-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${levelBadges[entry.level]} ${levelColors[entry.level]}`}
       >
         {entry.level.toUpperCase()}
       </span>
