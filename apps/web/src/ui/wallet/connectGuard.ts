@@ -1,16 +1,20 @@
 'use client';
 
-const FALLBACK_WALLETCONNECT_PROJECT_ID = '00000000000000000000000000000000';
+function normalizeWalletConnectError(error: unknown): string {
+  const message =
+    error instanceof Error ? error.message.trim() : typeof error === 'string' ? error.trim() : '';
 
-function getWalletRelayProjectId(): string {
-  return (
-    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim() || FALLBACK_WALLETCONNECT_PROJECT_ID
-  );
-}
-
-export function hasConfiguredWalletRelayProjectId(): boolean {
-  const projectId = getWalletRelayProjectId();
-  return projectId.length > 0 && projectId !== FALLBACK_WALLETCONNECT_PROJECT_ID;
+  const lowered = message.toLowerCase();
+  if (lowered.includes('fatal socket error') || lowered.includes('transport')) {
+    return 'Unable to reach the wallet relay. Please try again in a few seconds.';
+  }
+  if (lowered.includes('reject') || lowered.includes('declin')) {
+    return 'Connection request was rejected in Paytaca.';
+  }
+  if (message) {
+    return message;
+  }
+  return 'Failed to connect Paytaca wallet.';
 }
 
 export async function connectPaytacaWithGuard(params: {
@@ -19,10 +23,6 @@ export async function connectPaytacaWithGuard(params: {
   timeoutMs?: number;
 }): Promise<void> {
   const { connect, refetchAddresses, timeoutMs = 12000 } = params;
-
-  if (!hasConfiguredWalletRelayProjectId()) {
-    throw new Error('Paytaca 연결 설정이 누락되었습니다. 운영 환경 변수 확인 후 다시 시도하세요.');
-  }
 
   let timer: number | undefined;
   try {
@@ -36,11 +36,15 @@ export async function connectPaytacaWithGuard(params: {
       new Promise<never>((_, reject) => {
         timer = window.setTimeout(() => {
           reject(
-            new Error('Paytaca 연결이 응답하지 않습니다. 확장지갑 팝업/네트워크를 확인하세요.')
+            new Error(
+              'Paytaca connection timed out. Check the wallet popup and your network, then try again.'
+            )
           );
         }, timeoutMs);
       }),
     ]);
+  } catch (error) {
+    throw new Error(normalizeWalletConnectError(error));
   } finally {
     if (timer !== undefined) {
       window.clearTimeout(timer);
