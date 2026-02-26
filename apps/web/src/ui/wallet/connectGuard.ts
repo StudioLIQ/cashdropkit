@@ -22,7 +22,7 @@ export async function connectPaytacaWithGuard(params: {
   refetchAddresses?: () => Promise<void>;
   timeoutMs?: number;
 }): Promise<string | null> {
-  const { connect, refetchAddresses, timeoutMs = 12000 } = params;
+  const { connect, refetchAddresses, timeoutMs = 45000 } = params;
 
   let timer: number | undefined;
   try {
@@ -37,7 +37,7 @@ export async function connectPaytacaWithGuard(params: {
         timer = window.setTimeout(() => {
           reject(
             new Error(
-              'Paytaca connection timed out. Check the wallet popup and your network, then try again.'
+              'Paytaca pairing timed out. Keep the extension open, approve the session request, and try again.'
             )
           );
         }, timeoutMs);

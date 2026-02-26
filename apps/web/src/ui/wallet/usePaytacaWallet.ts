@@ -1,20 +1,16 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect } from 'react';
+
+import { useSignTransaction as useBchConnectSignTransaction, useWallet as useBchConnectWallet } from 'bch-connect';
+import type { WcSignTransactionRequest } from 'bch-connect';
 
 import { useExtensionWalletStore } from '@/stores';
 
 import type { Network } from '@/core/db/types';
 
-import { connectPaytacaDirect, getPaytacaProvider, waitForPaytacaProvider } from './paytacaDirect';
-
 export interface PaytacaSignTransactionRequest {
-  txRequest: {
-    transaction: unknown;
-    sourceOutputs: unknown[];
-    broadcast?: boolean;
-    userPrompt?: string;
-  };
+  txRequest: WcSignTransactionRequest;
 }
 
 export interface PaytacaSignTransactionResponse {
@@ -22,87 +18,64 @@ export interface PaytacaSignTransactionResponse {
   signedTransactionHash: string;
 }
 
-export function useWallet(network: Network = 'testnet') {
-  const { connectedAddress, setConnectedAddress, clearConnectedAddress } =
-    useExtensionWalletStore();
-  const [connectError, setConnectError] = useState<Error | null>(null);
-  const [disconnectError, setDisconnectError] = useState<Error | null>(null);
+export function useWallet(_network: Network = 'testnet') {
+  const wallet = useBchConnectWallet();
+  const { setConnectedAddress, clearConnectedAddress } = useExtensionWalletStore();
+
+  const effectiveAddress = wallet.tokenAddress || wallet.address || null;
+
+  useEffect(() => {
+    if (effectiveAddress) {
+      setConnectedAddress(effectiveAddress);
+    } else {
+      clearConnectedAddress();
+    }
+  }, [effectiveAddress, setConnectedAddress, clearConnectedAddress]);
 
   const connect = useCallback(async () => {
     try {
-      setConnectError(null);
-      const address = await connectPaytacaDirect(network);
-      if (!address) {
+      await wallet.connect();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+      const lowered = message.toLowerCase();
+
+      if (lowered.includes('fatal socket error') || lowered.includes('transport')) {
         throw new Error(
-          'Paytaca extension wallet was not detected. Confirm the extension is enabled for this site and opened in this Chrome profile.'
+          'Unable to reach the Paytaca relay. Retry after opening Paytaca extension and approving the pairing request.'
         );
       }
-      setConnectedAddress(address);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to connect Paytaca wallet.');
-      setConnectError(err);
-      throw err;
+      throw error;
     }
-  }, [network, setConnectedAddress]);
+  }, [wallet]);
 
   const disconnect = useCallback(async () => {
-    try {
-      setDisconnectError(null);
-      clearConnectedAddress();
-    } catch (error) {
-      const err =
-        error instanceof Error ? error : new Error('Failed to disconnect Paytaca wallet.');
-      setDisconnectError(err);
-      throw err;
-    }
-  }, [clearConnectedAddress]);
+    await wallet.disconnect();
+  }, [wallet]);
 
   const refetchAddresses = useCallback(async () => {
-    if (connectedAddress) {
-      setConnectedAddress(connectedAddress);
-    }
-  }, [connectedAddress, setConnectedAddress]);
+    await wallet.refetchAddresses();
+  }, [wallet]);
 
   return {
-    address: connectedAddress,
-    tokenAddress: connectedAddress,
-    isConnected: Boolean(connectedAddress),
+    ...wallet,
     connect,
     disconnect,
-    connectError,
-    disconnectError,
     refetchAddresses,
-    areAddressesLoading: false,
-    addressError: null as Error | null,
-    tokenAddressError: null as Error | null,
-    session: null,
-    isError: Boolean(connectError || disconnectError),
   };
 }
 
 export function useSignTransaction() {
+  const { signTransaction: signViaBchConnect } = useBchConnectSignTransaction();
+
   const signTransaction = useCallback(
     async ({
       txRequest,
     }: PaytacaSignTransactionRequest): Promise<PaytacaSignTransactionResponse | null> => {
-      const provider = getPaytacaProvider() ?? (await waitForPaytacaProvider());
-      if (!provider?.signTransaction && !provider?.request) {
-        throw new Error(
-          'Paytaca extension wallet was not detected. Confirm the extension is enabled for this site and opened in this Chrome profile.'
-        );
-      }
-
-      const result = provider.signTransaction
-        ? await provider.signTransaction(txRequest)
-        : ((await provider.request?.({
-            method: 'bch_signTransaction',
-            params: txRequest,
-          })) as
-            | {
-                signedTransaction: string;
-                signedTransactionHash: string;
-              }
-            | undefined);
+      const result = await signViaBchConnect({
+        txRequest,
+        requestExpirySeconds: 300,
+      });
 
       if (!result) {
         return null;
@@ -113,7 +86,7 @@ export function useSignTransaction() {
         signedTransactionHash: result.signedTransactionHash,
       };
     },
-    []
+    [signViaBchConnect]
   );
 
   return { signTransaction };

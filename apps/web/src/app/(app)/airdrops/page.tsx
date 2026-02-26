@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useAirdropStore, useConnectionStore } from '@/stores';
 
@@ -12,7 +12,6 @@ export default function AirdropsPage() {
   const { network } = useConnectionStore();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const {
     campaigns,
     isLoadingList,
@@ -35,14 +34,16 @@ export default function AirdropsPage() {
   }, [loadCampaigns, network]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get('create') !== '1') return;
+
     openCreateModal();
 
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.delete('create');
-    const query = nextParams.toString();
+    searchParams.delete('create');
+    const query = searchParams.toString();
     router.replace(query ? `${pathname}?${query}` : pathname);
-  }, [openCreateModal, pathname, router, searchParams]);
+  }, [openCreateModal, pathname, router]);
 
   const handleDelete = async (id: string) => {
     await deleteCampaign(id);
