@@ -14,11 +14,13 @@ import {
   createCampaign,
   createVestingCampaign,
   deleteCampaign,
+  deleteVestingCampaign,
   getCampaign,
   getVestingCampaign,
   listCampaigns,
   listVestingCampaigns,
   updateCampaign,
+  updateVestingCampaign,
 } from './routes/campaigns.js';
 import { Router, json } from './routes/router.js';
 
@@ -71,6 +73,8 @@ async function bootstrap(): Promise<void> {
           list: 'GET /api/v1/vesting',
           get: 'GET /api/v1/vesting/:id',
           create: 'POST /api/v1/vesting',
+          update: 'PATCH /api/v1/vesting/:id',
+          delete: 'DELETE /api/v1/vesting/:id',
         },
       },
     });
@@ -87,6 +91,8 @@ async function bootstrap(): Promise<void> {
   router.get('/api/v1/vesting', listVestingCampaigns);
   router.get('/api/v1/vesting/:id', getVestingCampaign);
   router.post('/api/v1/vesting', createVestingCampaign);
+  router.patch('/api/v1/vesting/:id', updateVestingCampaign);
+  router.delete('/api/v1/vesting/:id', deleteVestingCampaign);
 
   // ============================================================================
   // Server

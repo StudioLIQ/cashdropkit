@@ -224,18 +224,6 @@ export default function WalletsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
-        <div className="text-sm text-blue-800 dark:text-blue-200">
-          <p className="font-medium">Security model (updated)</p>
-          <p className="mt-1">
-            CashDrop no longer requires recovery phrase input in wallet onboarding for normal usage.
-            Use extension wallet connection and keep seed in wallet app only.
-          </p>
-          <p className="mt-2">
-            Supported extension wallet: <strong>Paytaca Wallet</strong>.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

@@ -19,6 +19,10 @@ function isSupportedNetwork(network: unknown): network is typeof SUPPORTED_NETWO
   return network === SUPPORTED_NETWORK;
 }
 
+function toSnakeCase(field: string): string {
+  return field.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+}
+
 // ============================================================================
 // Airdrop Campaigns
 // ============================================================================
@@ -82,10 +86,10 @@ export async function createCampaign(ctx: RouteContext): Promise<void> {
   const db = getDb();
   const body = ctx.body as Record<string, unknown>;
 
-  if (!body || !body.id || !body.name || !body.network || !body.tokenId) {
+  if (!body || !body.id || !body.name || !body.network) {
     json(ctx.res, 400, {
       success: false,
-      error: { code: 'VALIDATION_ERROR', message: 'Required fields: id, name, network, tokenId' },
+      error: { code: 'VALIDATION_ERROR', message: 'Required fields: id, name, network' },
     });
     return;
   }
@@ -103,7 +107,7 @@ export async function createCampaign(ctx: RouteContext): Promise<void> {
     userId: ctx.user.userId,
     name: body.name as string,
     network: SUPPORTED_NETWORK,
-    tokenId: body.tokenId as string,
+    tokenId: (body.tokenId as string) || '',
     tokenSymbol: (body.tokenSymbol as string) || null,
     tokenName: (body.tokenName as string) || null,
     tokenDecimals: (body.tokenDecimals as number) || null,
@@ -135,13 +139,26 @@ export async function updateCampaign(ctx: RouteContext): Promise<void> {
   const updateSet: Record<string, unknown> = { updatedAt: new Date() };
   const allowedFields = [
     'name',
+    'tokenId',
+    'tokenSymbol',
+    'tokenName',
+    'tokenDecimals',
+    'tokenIconUrl',
+    'tokenVerified',
+    'mode',
+    'amountUnit',
     'recipients',
     'feeRateSatPerByte',
     'dustSatPerOutput',
     'maxOutputsPerTx',
     'maxInputsPerTx',
     'allowMergeDuplicates',
+    'rounding',
     'sourceWalletId',
+    'tokenUtxoSelection',
+    'bchUtxoSelection',
+    'selectedTokenUtxos',
+    'selectedBchUtxos',
     'plan',
     'execution',
     'tags',
@@ -150,8 +167,7 @@ export async function updateCampaign(ctx: RouteContext): Promise<void> {
 
   for (const field of allowedFields) {
     if (field in (body || {})) {
-      // Map camelCase to snake_case for Drizzle
-      const snakeField = field.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+      const snakeField = toSnakeCase(field);
       updateSet[snakeField] = (body as Record<string, unknown>)[field];
     }
   }
@@ -188,6 +204,15 @@ export async function deleteCampaign(ctx: RouteContext): Promise<void> {
 export async function listVestingCampaigns(ctx: RouteContext): Promise<void> {
   const db = getDb();
   const { page, pageSize } = parsePagination(ctx.query);
+  const network = ctx.query.get('network');
+
+  if (network && !isSupportedNetwork(network)) {
+    json(ctx.res, 400, {
+      success: false,
+      error: { code: 'UNSUPPORTED_NETWORK', message: 'Only testnet is currently supported' },
+    });
+    return;
+  }
 
   const rows = await db
     .select()
@@ -229,12 +254,12 @@ export async function createVestingCampaign(ctx: RouteContext): Promise<void> {
   const db = getDb();
   const body = ctx.body as Record<string, unknown>;
 
-  if (!body || !body.id || !body.name || !body.network || !body.tokenId || !body.template || !body.schedule) {
+  if (!body || !body.id || !body.name || !body.network || !body.template || !body.schedule) {
     json(ctx.res, 400, {
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Required fields: id, name, network, tokenId, template, schedule',
+        message: 'Required fields: id, name, network, template, schedule',
       },
     });
     return;
@@ -253,11 +278,83 @@ export async function createVestingCampaign(ctx: RouteContext): Promise<void> {
     userId: ctx.user.userId,
     name: body.name as string,
     network: SUPPORTED_NETWORK,
-    tokenId: body.tokenId as string,
+    tokenId: (body.tokenId as string) || '',
+    tokenSymbol: (body.tokenSymbol as string) || null,
+    tokenName: (body.tokenName as string) || null,
+    tokenDecimals: (body.tokenDecimals as number) || null,
     template: body.template as 'CLIFF_ONLY' | 'MONTHLY_TRANCHES' | 'CUSTOM_TRANCHES',
     schedule: body.schedule as Record<string, unknown>,
     beneficiaries: (body.beneficiaries as unknown[]) || [],
+    feeRateSatPerByte: (body.feeRateSatPerByte as number) || 1,
+    dustSatPerOutput: (body.dustSatPerOutput as number) || 546,
+    sourceWalletId: (body.sourceWalletId as string) || null,
   });
 
   json(ctx.res, 201, { success: true, data: { id: body.id } });
+}
+
+/** PATCH /api/v1/vesting/:id — Update vesting campaign */
+export async function updateVestingCampaign(ctx: RouteContext): Promise<void> {
+  const db = getDb();
+  const body = ctx.body as Record<string, unknown>;
+
+  const existing = await db
+    .select({ id: vestingCampaigns.id })
+    .from(vestingCampaigns)
+    .where(and(eq(vestingCampaigns.id, ctx.params.id), eq(vestingCampaigns.userId, ctx.user.userId)));
+
+  if (existing.length === 0) {
+    json(ctx.res, 404, { success: false, error: { code: 'NOT_FOUND', message: 'Vesting campaign not found' } });
+    return;
+  }
+
+  const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+  const allowedFields = [
+    'name',
+    'tokenId',
+    'tokenSymbol',
+    'tokenName',
+    'tokenDecimals',
+    'tokenIconUrl',
+    'tokenVerified',
+    'template',
+    'schedule',
+    'beneficiaries',
+    'feeRateSatPerByte',
+    'dustSatPerOutput',
+    'lockScriptType',
+    'sourceWalletId',
+    'plan',
+    'execution',
+  ];
+
+  for (const field of allowedFields) {
+    if (field in (body || {})) {
+      const snakeField = toSnakeCase(field);
+      updateSet[snakeField] = (body as Record<string, unknown>)[field];
+    }
+  }
+
+  await db
+    .update(vestingCampaigns)
+    .set(updateSet)
+    .where(eq(vestingCampaigns.id, ctx.params.id));
+
+  json(ctx.res, 200, { success: true });
+}
+
+/** DELETE /api/v1/vesting/:id — Delete vesting campaign */
+export async function deleteVestingCampaign(ctx: RouteContext): Promise<void> {
+  const db = getDb();
+
+  const result = await db
+    .delete(vestingCampaigns)
+    .where(and(eq(vestingCampaigns.id, ctx.params.id), eq(vestingCampaigns.userId, ctx.user.userId)));
+
+  if (result.rowCount === 0) {
+    json(ctx.res, 404, { success: false, error: { code: 'NOT_FOUND', message: 'Vesting campaign not found' } });
+    return;
+  }
+
+  json(ctx.res, 200, { success: true });
 }
