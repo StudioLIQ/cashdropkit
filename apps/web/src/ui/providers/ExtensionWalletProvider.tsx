@@ -1,16 +1,18 @@
 'use client';
 
-import { BCHConnectProvider, createConfig } from 'bch-connect';
+import { BCHConnectProvider, bchConnectModal } from 'bch-connect';
+import type { Configuration, CreatedConfig, ModalFactory } from 'bch-connect';
 
 const FALLBACK_WALLETCONNECT_PROJECT_ID = '00000000000000000000000000000000';
 
 function getProjectId(): string {
-  const configured = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
-  if (configured) return configured;
-  return FALLBACK_WALLETCONNECT_PROJECT_ID;
+  // Hardcoded fallback for hackathon/demo builds.
+  return (
+    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim() || FALLBACK_WALLETCONNECT_PROJECT_ID
+  );
 }
 
-const config = createConfig({
+const baseConfig: Configuration = {
   projectId: getProjectId(),
   network: 'testnet',
   metadata: {
@@ -19,8 +21,14 @@ const config = createConfig({
     url: 'https://www.cashdropkit.com',
     icons: ['https://www.cashdropkit.com/favicon.svg'],
   },
-  supportLegacyClient: true,
-});
+  sessionType: 'Wallet Connect V2',
+  supportLegacyClient: false,
+  debug: false,
+};
+
+// Avoid createConfig(): it eagerly creates modal and touches `document` during SSR prerender.
+const modalFactory: ModalFactory = ({ sessionType }) => bchConnectModal({ sessionType });
+const config = { ...baseConfig, modal: modalFactory } as CreatedConfig;
 
 export function ExtensionWalletProvider({
   children,
