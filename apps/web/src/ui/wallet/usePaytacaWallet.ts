@@ -40,7 +40,11 @@ export function useWallet(_network: Network = 'testnet') {
         error instanceof Error ? error.message : typeof error === 'string' ? error : '';
       const lowered = message.toLowerCase();
 
-      if (lowered.includes('fatal socket error') || lowered.includes('transport')) {
+      if (
+        lowered.includes('fatal socket error') ||
+        lowered.includes('transport') ||
+        lowered.includes('interrupted while trying to subscribe')
+      ) {
         throw new Error(
           'Unable to reach the Paytaca relay. Retry after opening Paytaca extension and approving the pairing request.'
         );

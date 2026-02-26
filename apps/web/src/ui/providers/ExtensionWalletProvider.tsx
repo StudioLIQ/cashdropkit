@@ -3,7 +3,9 @@
 import { BCHConnectProvider, bchConnectModal } from 'bch-connect';
 import type { Configuration, CreatedConfig, ModalFactory } from 'bch-connect';
 
-const FALLBACK_WALLETCONNECT_PROJECT_ID = '00000000000000000000000000000000';
+const PAYTACA_WALLETCONNECT_PROJECT_ID = 'b7c10b6ffc9f3911c913020d9fbb2d51';
+const ZERO_PROJECT_ID = '00000000000000000000000000000000';
+const PAYTACA_EXTENSION_ID = 'pakphhpnneopheifihmjcjnbdbhaaiaa';
 
 const PAYTACA_ONLY_WALLETS = [
   {
@@ -12,15 +14,17 @@ const PAYTACA_ONLY_WALLETS = [
     iconUrl: 'https://www.paytaca.com/favicon.png',
     links: {
       native: 'paytaca://apps/wallet-connect?uri={{uri}}',
-      fallback: 'https://www.paytaca.com/applications/wallet',
+      fallback: `chrome-extension://${PAYTACA_EXTENSION_ID}/www/index.html#/apps/wallet-connect?uri={{uri}}`,
     },
   },
 ] as const;
 
 function getProjectId(): string {
-  return (
-    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim() || FALLBACK_WALLETCONNECT_PROJECT_ID
-  );
+  const fromEnv = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
+  if (!fromEnv || fromEnv === ZERO_PROJECT_ID) {
+    return PAYTACA_WALLETCONNECT_PROJECT_ID;
+  }
+  return fromEnv;
 }
 
 const modalFactory: ModalFactory = ({ sessionType }) =>

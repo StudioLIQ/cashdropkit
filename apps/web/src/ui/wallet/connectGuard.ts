@@ -8,6 +8,12 @@ function normalizeConnectError(error: unknown): string {
   if (lowered.includes('fatal socket error') || lowered.includes('transport')) {
     return 'Unable to reach the wallet relay. Please try again in a few seconds.';
   }
+  if (lowered.includes('interrupted while trying to subscribe')) {
+    return 'Wallet relay connection was interrupted. Retry once after re-opening the Paytaca extension.';
+  }
+  if (lowered.includes('project not found')) {
+    return 'Wallet relay project configuration is invalid. Reload the app and try connecting again.';
+  }
   if (lowered.includes('reject') || lowered.includes('declin')) {
     return 'Connection request was rejected in Paytaca.';
   }
