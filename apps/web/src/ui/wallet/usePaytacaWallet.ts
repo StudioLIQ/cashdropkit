@@ -6,7 +6,7 @@ import { useExtensionWalletStore } from '@/stores';
 
 import type { Network } from '@/core/db/types';
 
-import { connectPaytacaDirect, getPaytacaProvider } from './paytacaDirect';
+import { connectPaytacaDirect, getPaytacaProvider, waitForPaytacaProvider } from './paytacaDirect';
 
 export interface PaytacaSignTransactionRequest {
   txRequest: {
@@ -33,7 +33,9 @@ export function useWallet(network: Network = 'testnet') {
       setConnectError(null);
       const address = await connectPaytacaDirect(network);
       if (!address) {
-        throw new Error('Paytaca extension wallet was not detected.');
+        throw new Error(
+          'Paytaca extension wallet was not detected. Confirm the extension is enabled for this site and opened in this Chrome profile.'
+        );
       }
       setConnectedAddress(address);
     } catch (error) {
@@ -83,9 +85,11 @@ export function useSignTransaction() {
     async ({
       txRequest,
     }: PaytacaSignTransactionRequest): Promise<PaytacaSignTransactionResponse | null> => {
-      const provider = getPaytacaProvider();
+      const provider = getPaytacaProvider() ?? (await waitForPaytacaProvider());
       if (!provider?.signTransaction && !provider?.request) {
-        throw new Error('Paytaca extension wallet was not detected.');
+        throw new Error(
+          'Paytaca extension wallet was not detected. Confirm the extension is enabled for this site and opened in this Chrome profile.'
+        );
       }
 
       const result = provider.signTransaction
