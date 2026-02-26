@@ -41,7 +41,7 @@ export function ExecuteStep() {
     stopConfirmationPolling,
     clearError,
   } = useAirdropStore();
-  const { wallets, activeWalletId } = useWalletStore();
+  const { wallets, activeWalletId, selectWallet } = useWalletStore();
   const { signTransaction } = useSignTransaction();
   const {
     address: connectedAddress,
@@ -49,6 +49,7 @@ export function ExecuteStep() {
     isConnected: isExtensionConnected,
     connect: connectExtensionWallet,
     connectError,
+    refetchAddresses,
   } = useWallet();
   const effectiveConnectedAddress = connectedTokenAddress || connectedAddress;
 
@@ -60,8 +61,11 @@ export function ExecuteStep() {
     null
   );
 
-  // Get active wallet
-  const activeWallet = wallets.find((w) => w.id === activeWalletId);
+  // Get active wallet (fallback to campaign source wallet)
+  const campaignSourceWalletId = activeCampaign?.funding.sourceWalletId;
+  const activeWallet =
+    wallets.find((w) => w.id === activeWalletId) ||
+    wallets.find((w) => w.id === campaignSourceWalletId);
 
   const execution = activeCampaign?.execution;
   const plan = activeCampaign?.plan;
@@ -82,6 +86,13 @@ export function ExecuteStep() {
   const hasPendingConfirmations = confirmationStates.some(
     (s) => s.status === 'SEEN' || s.status === 'UNKNOWN'
   );
+
+  useEffect(() => {
+    if (!campaignSourceWalletId || activeWalletId === campaignSourceWalletId) return;
+    selectWallet(campaignSourceWalletId).catch(() => {
+      // Store error is handled in wallet store; no-op here to avoid UI interruption.
+    });
+  }, [campaignSourceWalletId, activeWalletId, selectWallet]);
 
   // Auto-start confirmation polling when execution completes with SENT txids
   useEffect(() => {
@@ -126,6 +137,7 @@ export function ExecuteStep() {
         if (!isExtensionConnected) {
           setIsConnectingExtension(true);
           await connectExtensionWallet();
+          await refetchAddresses();
         }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
@@ -140,7 +152,10 @@ export function ExecuteStep() {
         return;
       }
 
-      if (effectiveConnectedAddress && sourceAddress !== effectiveConnectedAddress) {
+      if (
+        effectiveConnectedAddress &&
+        sourceAddress.toLowerCase() !== effectiveConnectedAddress.toLowerCase()
+      ) {
         setLocalError('Active wallet address and connected extension address do not match');
         return;
       }
@@ -179,6 +194,7 @@ export function ExecuteStep() {
       effectiveConnectedAddress,
       isExtensionConnected,
       connectExtensionWallet,
+      refetchAddresses,
       signTransaction,
       forceRebuild,
       startExecution,

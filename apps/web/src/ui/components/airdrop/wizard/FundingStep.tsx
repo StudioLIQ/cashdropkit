@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAirdropStore, useUtxoStore, useWalletStore } from '@/stores';
+import { useWallet } from 'bch-connect';
 
 import { outpointId } from '@/core/adapters/chain/types';
 import type { Outpoint } from '@/core/adapters/chain/types';
@@ -11,7 +12,15 @@ import { formatBchAmount, formatTokenAmount } from '@/core/utxo';
 
 export function FundingStep() {
   const { activeCampaign, updateCampaignFunding } = useAirdropStore();
-  const { wallets } = useWalletStore();
+  const { wallets, activeWalletId, addWatchOnlyWallet, selectWallet } = useWalletStore();
+  const {
+    connect,
+    isConnected,
+    address: extensionAddress,
+    tokenAddress: extensionTokenAddress,
+    connectError,
+    refetchAddresses,
+  } = useWallet();
   const {
     isFetching,
     fetchError,
@@ -32,14 +41,19 @@ export function FundingStep() {
     validateSelection,
     reset: resetUtxoStore,
   } = useUtxoStore();
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSyncingSourceWallet, setIsSyncingSourceWallet] = useState(false);
+  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
 
   // Get current wallet and its primary address
   const currentWallet = useMemo(
     () => wallets.find((w) => w.id === activeCampaign?.funding.sourceWalletId),
     [wallets, activeCampaign?.funding.sourceWalletId]
   );
+  const currentWalletAddress = currentWallet?.addresses?.[0] || currentWallet?.watchAddress;
 
-  const primaryAddress = currentWallet?.addresses?.[0];
+  const primaryAddress = currentWalletAddress;
 
   // Calculate requirements from campaign
   const requirements = useMemo(() => {
@@ -92,16 +106,105 @@ export function FundingStep() {
     validateSelection,
   ]);
 
-  const handleWalletSelect = useCallback(
-    async (walletId: string) => {
+  const syncConnectedSourceWallet = useCallback(
+    async (address: string) => {
       if (!activeCampaign) return;
-      await updateCampaignFunding({
-        ...activeCampaign.funding,
-        sourceWalletId: walletId,
-      });
+
+      const normalizedAddress = address.trim().toLowerCase();
+      const existingWallet = wallets.find(
+        (wallet) =>
+          wallet.network === activeCampaign.network &&
+          ((wallet.watchAddress && wallet.watchAddress.toLowerCase() === normalizedAddress) ||
+            wallet.addresses?.some(
+              (walletAddress) => walletAddress.toLowerCase() === normalizedAddress
+            ))
+      );
+
+      const sourceWallet =
+        existingWallet ??
+        (await addWatchOnlyWallet(
+          `Paytaca ${address.slice(0, 8)}...${address.slice(-6)}`,
+          address,
+          activeCampaign.network
+        ));
+
+      if (activeWalletId !== sourceWallet.id) {
+        await selectWallet(sourceWallet.id);
+      }
+
+      if (activeCampaign.funding.sourceWalletId !== sourceWallet.id) {
+        await updateCampaignFunding({
+          ...activeCampaign.funding,
+          sourceWalletId: sourceWallet.id,
+        });
+      }
     },
-    [activeCampaign, updateCampaignFunding]
+    [
+      activeCampaign,
+      wallets,
+      addWatchOnlyWallet,
+      activeWalletId,
+      selectWallet,
+      updateCampaignFunding,
+    ]
   );
+
+  const handleConnectWallet = useCallback(async () => {
+    setLocalError(null);
+    try {
+      setIsConnecting(true);
+      await connect();
+      await refetchAddresses();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [connect, refetchAddresses]);
+
+  useEffect(() => {
+    const connected = effectiveExtensionAddress?.trim();
+    if (!activeCampaign || !isConnected || !connected) return;
+
+    const normalizedConnected = connected.toLowerCase();
+    const normalizedCurrentWalletAddress = currentWalletAddress?.toLowerCase();
+    const isAlreadySynced =
+      normalizedCurrentWalletAddress === normalizedConnected &&
+      activeCampaign.funding.sourceWalletId.length > 0 &&
+      activeWalletId === activeCampaign.funding.sourceWalletId;
+
+    if (isAlreadySynced) return;
+
+    let cancelled = false;
+    setLocalError(null);
+    setIsSyncingSourceWallet(true);
+
+    syncConnectedSourceWallet(connected)
+      .catch((err) => {
+        if (cancelled) return;
+        setLocalError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to auto-sync extension address as source wallet'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsSyncingSourceWallet(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCampaign,
+    isConnected,
+    effectiveExtensionAddress,
+    currentWalletAddress,
+    activeWalletId,
+    syncConnectedSourceWallet,
+  ]);
 
   const handleModeToggle = useCallback(() => {
     const newMode = selectionMode === 'auto' ? 'manual' : 'auto';
@@ -136,7 +239,6 @@ export function FundingStep() {
 
   if (!activeCampaign) return null;
 
-  const networkWallets = wallets.filter((w) => w.network === activeCampaign.network);
   const tokenDecimals = activeCampaign.token.decimals ?? 0;
   const tokenSymbol = activeCampaign.token.symbol ?? 'tokens';
 
@@ -168,62 +270,62 @@ export function FundingStep() {
           Funding & UTXO Selection
         </h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Select the source wallet and UTXOs to fund the distribution.
+          Connect your browser wallet and CashDrop will auto-bind it as source wallet.
         </p>
       </div>
 
-      {/* Wallet selection */}
-      <div>
-        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Source Wallet
-        </label>
-        <div className="mt-2 space-y-2">
-          {networkWallets.map((wallet) => (
+      {/* Extension wallet status */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Source Wallet (Extension)
+            </p>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {effectiveExtensionAddress
+                ? `Connected: ${effectiveExtensionAddress}`
+                : 'Connect Paytaca wallet to select source address automatically.'}
+            </p>
+          </div>
+          {!isConnected ? (
             <button
-              key={wallet.id}
               type="button"
-              onClick={() => handleWalletSelect(wallet.id)}
-              className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                wallet.id === activeCampaign.funding.sourceWalletId
-                  ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/50'
-                  : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700'
-              }`}
+              onClick={handleConnectWallet}
+              disabled={isConnecting}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100">{wallet.name}</div>
-                  <div className="mt-0.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                    {wallet.addresses?.[0]?.slice(0, 24)}...
-                  </div>
-                </div>
-                {wallet.id === activeCampaign.funding.sourceWalletId && (
-                  <svg
-                    className="h-5 w-5 text-emerald-600 dark:text-emerald-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                )}
-              </div>
+              {isConnecting ? 'Connecting...' : 'Connect Paytaca'}
             </button>
-          ))}
-
-          {networkWallets.length === 0 && (
-            <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/50">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                No wallets found for {activeCampaign.network}. Please create a wallet first.
-              </p>
-            </div>
-          )}
+          ) : null}
         </div>
+
+        {currentWalletAddress && (
+          <p className="mt-2 font-mono text-xs text-zinc-600 dark:text-zinc-300">
+            Bound source wallet: {currentWalletAddress}
+          </p>
+        )}
+        {isSyncingSourceWallet && (
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Syncing source wallet...</p>
+        )}
+        {(localError || connectError?.message) && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {localError || connectError?.message}
+          </p>
+        )}
+        {!currentWalletAddress && isConnected && !isSyncingSourceWallet && (
+          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            Connected address is not synced yet. Check extension network and reconnect.
+          </p>
+        )}
       </div>
+
+      {!currentWalletAddress && (
+        <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/50">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            Source wallet is required. Connect Paytaca extension to continue.
+          </p>
+        </div>
+      )}
 
       {/* UTXO Section */}
       {currentWallet && primaryAddress && (
