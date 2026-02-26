@@ -43,9 +43,11 @@ const baseConfig: Configuration = {
     icons: ['https://www.cashdropkit.com/favicon.svg'],
   },
   sessionType: 'Wallet Connect V2',
-  // Paytaca extension 0.22.11 is more stable with the 2.20-compatible client path.
-  supportLegacyClient: true,
-  debug: false,
+  // sign-client-v2-20 (npm alias for @walletconnect/sign-client@2.20.3) does not
+  // resolve correctly under pnpm strict isolation, causing the provider to silently
+  // fail to initialise.  Use the standard (latest) sign-client instead.
+  supportLegacyClient: false,
+  debug: process.env.NODE_ENV === 'development',
 };
 
 // Avoid createConfig(): it eagerly creates modal internals and can touch `document` during SSR.

@@ -33,6 +33,12 @@ export function useWallet(_network: Network = 'testnet') {
   }, [effectiveAddress, setConnectedAddress, clearConnectedAddress]);
 
   const connect = useCallback(async () => {
+    // If there's already a provider-level init error, surface it immediately
+    // so the user sees a meaningful message instead of a silent no-op.
+    if (wallet.connectError) {
+      throw wallet.connectError;
+    }
+
     try {
       await wallet.connect();
     } catch (error) {
@@ -50,6 +56,15 @@ export function useWallet(_network: Network = 'testnet') {
         );
       }
       throw error;
+    }
+
+    // bch-connect's connect() silently returns when the internal signClient
+    // or modal is not yet initialised.  Detect this and throw so callers
+    // (connectGuard / AppShell) can show a proper error.
+    if (!wallet.isConnected && !wallet.session) {
+      throw new Error(
+        'Wallet relay is still initialising. Wait a moment and try again.'
+      );
     }
   }, [wallet]);
 
