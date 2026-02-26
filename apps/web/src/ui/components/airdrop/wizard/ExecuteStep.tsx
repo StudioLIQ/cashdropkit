@@ -9,6 +9,8 @@ import type { BatchPlan } from '@/core/db/types';
 import type { AddressDerivation } from '@/core/signer';
 import { createWalletConnectSigner } from '@/core/signer';
 
+import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+
 import { BatchDetailModal } from './BatchDetailModal';
 
 /**
@@ -136,8 +138,10 @@ export function ExecuteStep() {
       try {
         if (!isExtensionConnected) {
           setIsConnectingExtension(true);
-          await connectExtensionWallet();
-          await refetchAddresses();
+          await connectPaytacaWithGuard({
+            connect: connectExtensionWallet,
+            refetchAddresses,
+          });
         }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
@@ -207,13 +211,16 @@ export function ExecuteStep() {
     setLocalError(null);
     try {
       setIsConnectingExtension(true);
-      await connectExtensionWallet();
+      await connectPaytacaWithGuard({
+        connect: connectExtensionWallet,
+        refetchAddresses,
+      });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
       setIsConnectingExtension(false);
     }
-  }, [connectExtensionWallet]);
+  }, [connectExtensionWallet, refetchAddresses]);
 
   if (!activeCampaign) return null;
 

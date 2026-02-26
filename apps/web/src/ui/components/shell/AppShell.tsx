@@ -10,6 +10,7 @@ import { initApiClient } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { ToastContainer } from '@/ui/components/toasts/ToastContainer';
+import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
 
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -108,8 +109,7 @@ export function AppShell({ children }: AppShellProps) {
     setWalletSyncError(null);
     try {
       setIsWalletConnecting(true);
-      await connect();
-      await refetchAddresses();
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setWalletSyncError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {

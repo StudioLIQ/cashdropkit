@@ -10,6 +10,8 @@ import type { Outpoint } from '@/core/adapters/chain/types';
 import { quickEstimate } from '@/core/planner';
 import { formatBchAmount, formatTokenAmount } from '@/core/utxo';
 
+import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+
 export function FundingStep() {
   const { activeCampaign, updateCampaignFunding } = useAirdropStore();
   const { wallets, activeWalletId, addWatchOnlyWallet, selectWallet } = useWalletStore();
@@ -153,8 +155,7 @@ export function FundingStep() {
     setLocalError(null);
     try {
       setIsConnecting(true);
-      await connect();
-      await refetchAddresses();
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {

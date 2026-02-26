@@ -9,6 +9,7 @@ import { settingsRepo } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { WalletListCard } from '@/ui/components/wallet';
+import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
 
 export default function WalletsPage() {
   const {
@@ -75,8 +76,7 @@ export default function WalletsPage() {
   const handleConnect = useCallback(async () => {
     setLocalError(null);
     try {
-      await connect();
-      await refetchAddresses();
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     }

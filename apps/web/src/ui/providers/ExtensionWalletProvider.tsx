@@ -4,6 +4,17 @@ import { BCHConnectProvider, bchConnectModal } from 'bch-connect';
 import type { Configuration, CreatedConfig, ModalFactory } from 'bch-connect';
 
 const FALLBACK_WALLETCONNECT_PROJECT_ID = '00000000000000000000000000000000';
+const PAYTACA_ONLY_WALLETS = [
+  {
+    id: 'paytaca',
+    name: 'Paytaca',
+    iconUrl: 'https://www.paytaca.com/favicon.png',
+    links: {
+      native: 'paytaca://apps/wallet-connect?uri={{uri}}',
+      fallback: 'https://www.paytaca.com/applications/wallet',
+    },
+  },
+] as const;
 
 function getProjectId(): string {
   // Hardcoded fallback for hackathon/demo builds.
@@ -22,12 +33,16 @@ const baseConfig: Configuration = {
     icons: ['https://www.cashdropkit.com/favicon.svg'],
   },
   sessionType: 'Wallet Connect V2',
-  supportLegacyClient: false,
+  supportLegacyClient: true,
   debug: false,
 };
 
 // Avoid createConfig(): it eagerly creates modal and touches `document` during SSR prerender.
-const modalFactory: ModalFactory = ({ sessionType }) => bchConnectModal({ sessionType });
+const modalFactory: ModalFactory = ({ sessionType }) =>
+  bchConnectModal({
+    sessionType,
+    wallets: [...PAYTACA_ONLY_WALLETS],
+  });
 const config = { ...baseConfig, modal: modalFactory } as CreatedConfig;
 
 export function ExtensionWalletProvider({

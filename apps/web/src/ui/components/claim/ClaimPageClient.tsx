@@ -14,6 +14,8 @@ import {
   parseClaimBundle,
 } from '@/core/tx/unlockTxBuilder';
 
+import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -113,8 +115,7 @@ export function ClaimPageClient({ campaignId }: ClaimPageClientProps) {
   const handleConnectWallet = useCallback(async () => {
     try {
       setIsConnecting(true);
-      await connect();
-      await refetchAddresses();
+      await connectPaytacaWithGuard({ connect, refetchAddresses });
     } catch {
       // connectError from hook is rendered in UI
     } finally {
