@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode, useCallback, useEffect } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { setGlobalAdapter, useConnectionStore, useWalletStore } from '@/stores';
+import { useWallet } from 'bch-connect';
 
 import { getConnectionService } from '@/core/adapters/chain/connectionService';
 import { initApiClient } from '@/core/db';
@@ -43,8 +44,83 @@ export function AppShell({ children }: AppShellProps) {
     useConnectionStore();
 
   // Wallet state
-  const { wallets, activeWalletId, loadWallets } = useWalletStore();
+  const { wallets, activeWalletId, loadWallets, addWatchOnlyWallet, selectWallet } =
+    useWalletStore();
   const activeWallet = wallets.find((w) => w.id === activeWalletId);
+  const {
+    connect,
+    disconnect,
+    isConnected: isExtensionConnected,
+    address: extensionAddress,
+    tokenAddress: extensionTokenAddress,
+    connectError,
+    refetchAddresses,
+  } = useWallet();
+  const [isWalletConnecting, setIsWalletConnecting] = useState(false);
+  const [walletSyncError, setWalletSyncError] = useState<string | null>(null);
+  const [syncingAddress, setSyncingAddress] = useState<string | null>(null);
+  const effectiveExtensionAddress = extensionTokenAddress || extensionAddress;
+  const walletError = walletSyncError || connectError?.message || null;
+
+  const syncConnectedWallet = useCallback(
+    async (address: string) => {
+      const normalizedAddress = address.trim().toLowerCase();
+      const existingWallet = wallets.find(
+        (wallet) =>
+          wallet.network === network &&
+          ((wallet.watchAddress && wallet.watchAddress.toLowerCase() === normalizedAddress) ||
+            wallet.addresses?.some(
+              (walletAddress) => walletAddress.toLowerCase() === normalizedAddress
+            ))
+      );
+
+      const sourceWallet =
+        existingWallet ??
+        (await addWatchOnlyWallet(
+          `Paytaca ${address.slice(0, 8)}...${address.slice(-6)}`,
+          address,
+          network
+        ));
+
+      if (activeWalletId !== sourceWallet.id) {
+        await selectWallet(sourceWallet.id);
+      }
+    },
+    [wallets, network, addWatchOnlyWallet, activeWalletId, selectWallet]
+  );
+
+  const syncTargetWalletId = useMemo(() => {
+    if (!effectiveExtensionAddress) return null;
+    const normalizedAddress = effectiveExtensionAddress.trim().toLowerCase();
+    return (
+      wallets.find(
+        (wallet) =>
+          wallet.network === network &&
+          ((wallet.watchAddress && wallet.watchAddress.toLowerCase() === normalizedAddress) ||
+            wallet.addresses?.some(
+              (walletAddress) => walletAddress.toLowerCase() === normalizedAddress
+            ))
+      )?.id ?? null
+    );
+  }, [wallets, network, effectiveExtensionAddress]);
+
+  const handleWalletConnect = useCallback(async () => {
+    setWalletSyncError(null);
+    try {
+      setIsWalletConnecting(true);
+      await connect();
+      await refetchAddresses();
+    } catch (err) {
+      setWalletSyncError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
+    } finally {
+      setIsWalletConnecting(false);
+    }
+  }, [connect, refetchAddresses]);
+
+  const handleWalletDisconnect = useCallback(() => {
+    setWalletSyncError(null);
+    disconnect();
+  }, [disconnect]);
 
   // Initialize connection on mount
   useEffect(() => {
@@ -90,6 +166,47 @@ export function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     loadWallets();
   }, [loadWallets]);
+
+  // Auto-sync extension wallet into app wallet store
+  useEffect(() => {
+    const connected = effectiveExtensionAddress?.trim();
+    if (!isExtensionConnected || !connected) return;
+
+    if (syncTargetWalletId && activeWalletId === syncTargetWalletId) {
+      return;
+    }
+
+    const normalizedAddress = connected.toLowerCase();
+    if (syncingAddress === normalizedAddress) return;
+
+    let cancelled = false;
+    setWalletSyncError(null);
+    setSyncingAddress(normalizedAddress);
+
+    syncConnectedWallet(connected)
+      .catch((err) => {
+        if (cancelled) return;
+        setWalletSyncError(
+          err instanceof Error ? err.message : 'Failed to sync connected extension wallet'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSyncingAddress((current) => (current === normalizedAddress ? null : current));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeWalletId,
+    effectiveExtensionAddress,
+    isExtensionConnected,
+    syncConnectedWallet,
+    syncTargetWalletId,
+    syncingAddress,
+  ]);
 
   // Handle network change
   const handleNetworkChange = useCallback(
@@ -137,6 +254,12 @@ export function AppShell({ children }: AppShellProps) {
           network={network}
           connectionStatus={status}
           walletLabel={activeWallet?.name}
+          walletAddress={effectiveExtensionAddress || undefined}
+          isWalletConnected={isExtensionConnected}
+          isWalletConnecting={isWalletConnecting}
+          walletError={walletError}
+          onWalletConnect={handleWalletConnect}
+          onWalletDisconnect={handleWalletDisconnect}
           isRetrying={isRetrying}
           lastError={lastError}
           onNetworkChange={handleNetworkChange}

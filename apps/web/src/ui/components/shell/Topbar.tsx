@@ -12,10 +12,16 @@ interface TopbarProps {
   network: Network;
   connectionStatus: ConnectionStatus;
   walletLabel?: string;
+  walletAddress?: string;
+  isWalletConnected?: boolean;
+  isWalletConnecting?: boolean;
+  walletError?: string | null;
   isRetrying?: boolean;
   lastError?: string | null;
   onNetworkChange?: (network: Network) => void;
   onRetry?: () => void;
+  onWalletConnect?: () => void | Promise<void>;
+  onWalletDisconnect?: () => void;
 }
 
 function ConnectionIndicator({
@@ -75,7 +81,7 @@ function ConnectionIndicator({
 
       {/* Tooltip with error details */}
       {showTooltip && lastError && (
-        <div className="cdk-panel absolute left-0 top-full z-[72] mt-2 w-64 rounded-xl p-3 text-sm">
+        <div className="cdk-panel absolute left-0 top-full z-[132] mt-2 w-64 rounded-xl p-3 text-sm">
           <div className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">Connection Error</div>
           <div className="text-zinc-500 dark:text-zinc-400">{lastError}</div>
           {canRetry && (
@@ -108,19 +114,31 @@ function NetworkSelector({
   );
 }
 
+function shortenAddress(address: string): string {
+  if (address.length <= 16) return address;
+  return `${address.slice(0, 10)}...${address.slice(-8)}`;
+}
+
 export function Topbar({
   network,
   connectionStatus,
   walletLabel,
+  walletAddress,
+  isWalletConnected = false,
+  isWalletConnecting = false,
+  walletError,
   isRetrying = false,
   lastError,
   onNetworkChange,
   onRetry,
+  onWalletConnect,
+  onWalletDisconnect,
 }: TopbarProps) {
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
 
   return (
-    <header className="cdk-topbar relative z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+    <header className="cdk-topbar relative z-[120] flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
       <div className="flex flex-wrap items-center gap-2 md:gap-3">
         <NetworkSelector
           network={network}
@@ -136,22 +154,86 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {walletLabel && (
-          <Link
-            href="/wallets"
-            className="cdk-pill hidden items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-700 hover:border-cyan-400/45 hover:bg-cyan-50/60 dark:text-zinc-200 dark:hover:bg-cyan-950/30 md:flex"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
-            <span className="max-w-32 truncate">{walletLabel}</span>
-          </Link>
-        )}
+        <div className="relative">
+          {isWalletConnected && walletAddress ? (
+            <button
+              type="button"
+              onClick={() => setIsWalletMenuOpen((open) => !open)}
+              className="cdk-pill inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-cyan-400/45 hover:bg-cyan-50/60 dark:text-zinc-200 dark:hover:bg-cyan-950/30"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="font-mono text-xs sm:text-sm">{shortenAddress(walletAddress)}</span>
+              <svg
+                className="h-4 w-4 text-zinc-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void onWalletConnect?.()}
+              disabled={isWalletConnecting}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition-transform hover:scale-[1.02] hover:from-cyan-400 hover:to-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+              {isWalletConnecting ? 'Connecting...' : 'Connect Wallet'}
+            </button>
+          )}
+
+          {isWalletMenuOpen && isWalletConnected && walletAddress && (
+            <>
+              <div className="fixed inset-0 z-[130]" onClick={() => setIsWalletMenuOpen(false)} />
+              <div className="cdk-panel absolute right-0 top-full z-[132] mt-2 w-72 rounded-xl p-3">
+                <div className="text-xs uppercase tracking-[0.1em] text-zinc-500 dark:text-zinc-400">
+                  Connected Wallet
+                </div>
+                <div className="mt-1 font-mono text-xs text-zinc-700 dark:text-zinc-200">
+                  {walletAddress}
+                </div>
+                {walletLabel && (
+                  <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    Active: {walletLabel}
+                  </div>
+                )}
+                <div className="mt-3 flex items-center gap-2">
+                  <Link
+                    href="/wallets"
+                    onClick={() => setIsWalletMenuOpen(false)}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Manage
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onWalletDisconnect?.();
+                      setIsWalletMenuOpen(false);
+                    }}
+                    className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="relative">
           <button
@@ -171,8 +253,8 @@ export function Topbar({
 
           {isCreateMenuOpen && (
             <>
-              <div className="fixed inset-0 z-[70]" onClick={() => setIsCreateMenuOpen(false)} />
-              <div className="cdk-panel absolute right-0 top-full z-[80] mt-2 w-52 rounded-xl py-1.5">
+              <div className="fixed inset-0 z-[130]" onClick={() => setIsCreateMenuOpen(false)} />
+              <div className="cdk-panel absolute right-0 top-full z-[133] mt-2 w-52 rounded-xl py-1.5">
                 <Link
                   href="/airdrops/new"
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-emerald-50/70 dark:text-zinc-300 dark:hover:bg-emerald-950/30"
@@ -208,6 +290,9 @@ export function Topbar({
           )}
         </div>
       </div>
+      {walletError && (
+        <div className="w-full text-xs text-red-600 dark:text-red-400">{walletError}</div>
+      )}
     </header>
   );
 }
