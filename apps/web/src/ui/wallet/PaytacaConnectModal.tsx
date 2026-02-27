@@ -639,8 +639,17 @@ export function PaytacaConnectModal() {
 
   const handleOpenExtension = useCallback(() => {
     if (!uri) return;
+    // Copy URI to clipboard first so the user can paste manually if the
+    // automatic deep-link handshake stalls.
+    navigator.clipboard.writeText(uri).catch(() => {});
     const extensionUrl = `chrome-extension://${PAYTACA_EXTENSION_ID}/www/index.html#/apps/wallet-connect?uri=${encodeURIComponent(uri)}`;
-    window.open(extensionUrl, '_blank');
+    // Use an anchor click instead of window.open — Chrome routes
+    // chrome-extension:// links more reliably through native navigation.
+    const a = document.createElement('a');
+    a.href = extensionUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.click();
     setExtensionOpened(true);
   }, [uri]);
 
@@ -687,31 +696,40 @@ export function PaytacaConnectModal() {
               {extensionDetected === null ? (
                 <>
                   <Spinner />
-                  <span>익스텐션 확인 중...</span>
+                  <span>Detecting extension...</span>
                 </>
               ) : (
                 <>
                   <PaytacaIcon />
-                  <span>Paytaca 익스텐션으로 연결</span>
+                  <span>Open Paytaca Extension</span>
                 </>
               )}
             </button>
             {extensionOpened && (
               <p className="mt-2 text-center text-xs text-zinc-400">
-                Paytaca 익스텐션에서 연결을 승인해주세요
+                Approve the connection in the Paytaca extension.
+                <br />
+                URI has been copied to clipboard.
               </p>
             )}
           </div>
         )}
 
+        {/* Copy URI button — always visible as a reliable fallback */}
+        <button
+          onClick={handleCopyUri}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition hover:border-zinc-500 hover:text-zinc-100"
+        >
+          <ClipboardIcon />
+          <span>{copied ? 'Copied!' : 'Copy WalletConnect URI'}</span>
+        </button>
+
         {/* Divider */}
-        {extensionDetected !== false && (
-          <div className="flex w-full items-center gap-3">
-            <div className="h-px flex-1 bg-zinc-700/60" />
-            <span className="text-xs text-zinc-500">또는 QR로 연결</span>
-            <div className="h-px flex-1 bg-zinc-700/60" />
-          </div>
-        )}
+        <div className="flex w-full items-center gap-3">
+          <div className="h-px flex-1 bg-zinc-700/60" />
+          <span className="text-xs text-zinc-500">or scan QR</span>
+          <div className="h-px flex-1 bg-zinc-700/60" />
+        </div>
 
         {/* QR Code */}
         <div className="flex flex-col items-center gap-3">
@@ -740,9 +758,7 @@ export function PaytacaConnectModal() {
             </div>
           )}
           <p className="text-center text-xs text-zinc-500">
-            Paytaca 모바일 앱으로 QR을 스캔하거나,
-            <br />
-            클릭하면 URI가 복사됩니다
+            Scan with Paytaca mobile app, or click to copy URI
           </p>
         </div>
       </div>
@@ -776,6 +792,15 @@ function Spinner() {
         strokeLinecap="round"
         className="opacity-75"
       />
+    </svg>
+  );
+}
+
+function ClipboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="5" y="2" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M3 5v7.5A1.5 1.5 0 0 0 4.5 14H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }
