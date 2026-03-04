@@ -15,7 +15,7 @@ import type { Network } from '@/core/db/types';
 
 import {
   PaytacaConnectModal,
-  subscribeModal,
+  emitModalState,
 } from '@/ui/wallet/PaytacaConnectModal';
 
 // ---------------------------------------------------------------------------
@@ -95,12 +95,15 @@ const METADATA = {
 };
 
 // ---------------------------------------------------------------------------
-// Relay reconnection with exponential backoff
+// Relay reconnection with exponential backoff (background only)
 // ---------------------------------------------------------------------------
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 
+/**
+ * For user-initiated actions (connect, signTransaction): try once, fail fast.
+ */
 async function ensureRelayConnected(client: SignClient): Promise<void> {
   const relayer = client.core.relayer as {
     connected: boolean;
@@ -108,22 +111,20 @@ async function ensureRelayConnected(client: SignClient): Promise<void> {
   };
   if (relayer.connected) return;
 
-  let delay = RECONNECT_BASE_MS;
-  const maxAttempts = 8;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      await relayer.restartTransport();
-      if (relayer.connected) return;
-    } catch (err) {
-      console.warn(
-        `[WC] Relay reconnect attempt ${attempt + 1} failed:`,
-        err,
-      );
-    }
-    await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(delay * 2, RECONNECT_MAX_MS);
+  try {
+    await relayer.restartTransport();
+  } catch (err) {
+    throw new Error(
+      `Relay connection failed: ${err instanceof Error ? err.message : 'unknown error'}. ` +
+        'Check your network and try again.',
+    );
   }
-  throw new Error('Unable to reconnect to WalletConnect relay after retries');
+
+  if (!relayer.connected) {
+    throw new Error(
+      'Unable to connect to WalletConnect relay. Check your network and try again.',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +142,9 @@ export function ExtensionWalletProvider({
   const [connectError, setConnectError] = useState<Error | null>(null);
   const [disconnectError, setDisconnectError] = useState<Error | null>(null);
   const initRef = useRef(false);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   // ---- Lazy SignClient init (SSR-safe via dynamic import) ----
   useEffect(() => {
@@ -152,6 +155,7 @@ export function ExtensionWalletProvider({
 
     (async () => {
       try {
+        console.log('[WC] Initializing SignClient...');
         const { SignClient } = await import('@walletconnect/sign-client');
         const client = await SignClient.init({
           projectId: getProjectId(),
@@ -159,34 +163,39 @@ export function ExtensionWalletProvider({
         });
 
         if (cancelled) return;
+        console.log('[WC] SignClient initialized successfully');
 
         // Restore existing session
         const sessions = client.session.getAll();
         if (sessions.length > 0) {
+          console.log('[WC] Restored existing session:', sessions[0].topic);
           setSession(sessions[0]);
         }
 
         // Wire session events
         client.on('session_delete', ({ topic }) => {
+          console.log('[WC] session_delete:', topic);
           setSession((prev) => (prev?.topic === topic ? null : prev));
         });
         client.on('session_expire', ({ topic }) => {
+          console.log('[WC] session_expire:', topic);
           setSession((prev) => (prev?.topic === topic ? null : prev));
         });
         client.on('session_update', ({ topic, params }) => {
+          console.log('[WC] session_update:', topic);
           setSession((prev) => {
             if (prev?.topic !== topic) return prev;
             return { ...prev, namespaces: params.namespaces };
           });
         });
-        client.on('session_event', () => {
-          // addressesChanged — re-read on next refetchAddresses call
+        client.on('session_event', (event) => {
+          console.log('[WC] session_event:', event);
         });
-        client.on('proposal_expire', () => {
-          // Modal close is handled by connect() flow
+        client.on('proposal_expire', (event) => {
+          console.log('[WC] proposal_expire:', event);
         });
 
-        // Wire relay reconnection
+        // Wire background relay reconnection (exponential backoff)
         const relayer = client.core.relayer as {
           on: (event: string, cb: () => void) => void;
           connected: boolean;
@@ -195,11 +204,13 @@ export function ExtensionWalletProvider({
 
         const scheduleReconnect = () => {
           if (reconnectTimerRef.current) return;
+          console.warn('[WC] Relay disconnected, scheduling reconnect...');
           let delay = RECONNECT_BASE_MS;
           const attempt = async () => {
             try {
               await relayer.restartTransport();
               if (relayer.connected) {
+                console.log('[WC] Relay reconnected');
                 reconnectTimerRef.current = undefined;
                 return;
               }
@@ -217,6 +228,7 @@ export function ExtensionWalletProvider({
 
         setSignClient(client);
       } catch (err) {
+        console.error('[WC] SignClient init failed:', err);
         if (!cancelled) {
           setConnectError(
             err instanceof Error
@@ -245,22 +257,27 @@ export function ExtensionWalletProvider({
   const connect = useCallback(async () => {
     if (!signClient) {
       throw new Error(
-        'Wallet provider is still initialising. Please wait and try again.',
+        'Wallet provider is still initialising. Please wait a moment and try again.',
       );
     }
 
     setConnectError(null);
 
-    // Ensure relay is connected before attempting
+    // Ensure relay is connected (try once, fail fast)
     await ensureRelayConnected(signClient);
 
     // Clean up stale pairings
     try {
       const pairings = signClient.core.pairing.getPairings();
       for (const pairing of pairings) {
-        if (!pairing.active || (pairing.expiry && pairing.expiry * 1000 < Date.now())) {
+        if (
+          !pairing.active ||
+          (pairing.expiry && pairing.expiry * 1000 < Date.now())
+        ) {
           try {
-            await signClient.core.pairing.disconnect({ topic: pairing.topic });
+            await signClient.core.pairing.disconnect({
+              topic: pairing.topic,
+            });
           } catch {
             // ignore cleanup errors
           }
@@ -271,6 +288,7 @@ export function ExtensionWalletProvider({
     }
 
     const chainId = BCH_CHAINS[network];
+    console.log('[WC] Connecting with chain:', chainId);
 
     const { uri, approval } = await signClient.connect({
       optionalNamespaces: {
@@ -282,24 +300,18 @@ export function ExtensionWalletProvider({
       },
     });
 
+    console.log('[WC] Got URI:', uri ? 'yes' : 'no');
+
     if (uri) {
-      // Open modal via bridge
-      const unsub = subscribeModal(() => {});
-      unsub();
-      // Emit open
-      (
-        await import('@/ui/wallet/PaytacaConnectModal')
-      ).emitModalState({ isOpen: true, uri });
+      emitModalState({ isOpen: true, uri });
     }
 
     try {
       const approved = await approval();
+      console.log('[WC] Session approved:', approved.topic);
       setSession(approved);
     } finally {
-      // Close modal
-      (
-        await import('@/ui/wallet/PaytacaConnectModal')
-      ).emitModalState({ isOpen: false, uri: '' });
+      emitModalState({ isOpen: false, uri: '' });
     }
   }, [signClient, network]);
 
