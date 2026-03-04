@@ -23,6 +23,9 @@ function normalizeConnectError(error: unknown): string {
   if (lowered.includes('reject') || lowered.includes('declin')) {
     return 'Connection request was rejected in Paytaca.';
   }
+  if (lowered.includes('subscribing') && lowered.includes('failed')) {
+    return 'Relay subscription failed. Please refresh the page and try connecting again.';
+  }
   if (lowered.includes('still initialising') || lowered.includes('still initializing')) {
     return 'Wallet relay is still loading. Please wait a moment and click Connect again.';
   }

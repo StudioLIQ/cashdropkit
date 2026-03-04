@@ -557,7 +557,7 @@ type ModalListener = (state: ModalState) => void;
 
 let _listener: ModalListener | null = null;
 
-function emitModalState(state: ModalState) {
+export function emitModalState(state: ModalState) {
   _listener?.(state);
 }
 
@@ -565,21 +565,6 @@ export function subscribeModal(listener: ModalListener): () => void {
   _listener = listener;
   return () => {
     if (_listener === listener) _listener = null;
-  };
-}
-
-/**
- * Returns a bch-connect compatible Modal object that bridges to the
- * React <PaytacaConnectModal /> component.
- */
-export function createPaytacaModalBridge(): { open(opts: { uri: string }): void; close(): void } {
-  return {
-    open({ uri }: { uri: string }) {
-      emitModalState({ isOpen: true, uri });
-    },
-    close() {
-      emitModalState({ isOpen: false, uri: '' });
-    },
   };
 }
 
