@@ -12,7 +12,7 @@ function normalizeConnectError(error: unknown): string {
     return 'Unable to reach the wallet relay. Check your WalletConnect project ID and try again.';
   }
   if (lowered.includes('interrupted while trying to subscribe')) {
-    return 'Wallet relay connection was interrupted. Retry once after re-opening the Paytaca extension.';
+    return 'Wallet relay connection was interrupted. Please try again.';
   }
   if (lowered.includes('project not found') || lowered.includes('walletconnect_project_id')) {
     return 'WalletConnect project ID is missing or invalid. Create one at https://cloud.reown.com and add to .env.local.';
@@ -21,7 +21,7 @@ function normalizeConnectError(error: unknown): string {
     return 'Wallet provider failed to start. Check browser console for details.';
   }
   if (lowered.includes('reject') || lowered.includes('declin')) {
-    return 'Connection request was rejected in Paytaca.';
+    return 'Connection request was rejected in wallet.';
   }
   if (lowered.includes('subscribing') && lowered.includes('failed')) {
     return 'Relay subscription failed. Please refresh the page and try connecting again.';
@@ -32,10 +32,10 @@ function normalizeConnectError(error: unknown): string {
   if (message) {
     return message;
   }
-  return 'Failed to connect Paytaca wallet.';
+  return 'Failed to connect wallet.';
 }
 
-export async function connectPaytacaWithGuard(params: {
+export async function connectWithGuard(params: {
   connect: () => Promise<void>;
   refetchAddresses?: () => Promise<void>;
   timeoutMs?: number;
@@ -55,7 +55,7 @@ export async function connectPaytacaWithGuard(params: {
         timer = window.setTimeout(() => {
           reject(
             new Error(
-              'Paytaca pairing timed out. Keep the extension open, approve the session request, and try again.'
+              'Wallet pairing timed out. Approve the session request in your wallet and try again.'
             )
           );
         }, timeoutMs);

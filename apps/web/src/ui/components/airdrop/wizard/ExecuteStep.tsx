@@ -8,8 +8,8 @@ import type { BatchPlan } from '@/core/db/types';
 import type { AddressDerivation } from '@/core/signer';
 import { createWalletConnectSigner } from '@/core/signer';
 
-import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
-import { useSignTransaction, useWallet } from '@/ui/wallet/usePaytacaWallet';
+import { connectWithGuard } from '@/ui/wallet/connectGuard';
+import { useSignTransaction, useWallet } from '@/ui/wallet/useWallet';
 
 import { BatchDetailModal } from './BatchDetailModal';
 
@@ -141,7 +141,7 @@ export function ExecuteStep() {
       try {
         if (!isExtensionConnected) {
           setIsConnectingExtension(true);
-          await connectPaytacaWithGuard({
+          await connectWithGuard({
             connect: connectExtensionWallet,
             refetchAddresses,
           });
@@ -214,7 +214,7 @@ export function ExecuteStep() {
     setLocalError(null);
     try {
       setIsConnectingExtension(true);
-      await connectPaytacaWithGuard({
+      await connectWithGuard({
         connect: connectExtensionWallet,
         refetchAddresses,
       });
@@ -426,7 +426,7 @@ export function ExecuteStep() {
           Extension wallet signing is required
         </p>
         <p className="mt-1 text-xs text-blue-700 dark:text-blue-400">
-          CashDrop now signs via connected Paytaca extension wallet. Recovery phrase input is not
+          CashDrop now signs via connected wallet extension wallet. Recovery phrase input is not
           used here.
         </p>
         <div className="mt-3 flex items-center gap-2">

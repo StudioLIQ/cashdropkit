@@ -14,8 +14,8 @@ import { initApiClient } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { ToastContainer } from '@/ui/components/toasts/ToastContainer';
-import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
-import { useWallet } from '@/ui/wallet/usePaytacaWallet';
+import { connectWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/useWallet';
 
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -86,7 +86,7 @@ export function AppShell({ children }: AppShellProps) {
       const sourceWallet =
         existingWallet ??
         (await addWatchOnlyWallet(
-          `Paytaca ${address.slice(0, 8)}...${address.slice(-6)}`,
+          `Wallet ${address.slice(0, 8)}...${address.slice(-6)}`,
           address,
           network
         ));
@@ -117,7 +117,7 @@ export function AppShell({ children }: AppShellProps) {
     setWalletSyncError(null);
     try {
       setIsWalletConnecting(true);
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      await connectWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setWalletSyncError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {

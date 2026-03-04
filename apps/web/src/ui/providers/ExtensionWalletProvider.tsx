@@ -6,7 +6,7 @@ import type { SessionTypes } from '@walletconnect/types';
 
 import type { Network } from '@/core/db/types';
 
-import { PaytacaConnectModal, emitModalState } from '@/ui/wallet/PaytacaConnectModal';
+import { WalletConnectModal, emitModalState } from '@/ui/wallet/WalletConnectModal';
 
 // ---------------------------------------------------------------------------
 // BCH WalletConnect namespace constants
@@ -327,7 +327,7 @@ export function ExtensionWalletProvider({
   return (
     <WalletConnectContext.Provider value={value}>
       {children}
-      <PaytacaConnectModal />
+      <WalletConnectModal />
     </WalletConnectContext.Provider>
   );
 }

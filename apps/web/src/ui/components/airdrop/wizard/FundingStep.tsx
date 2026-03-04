@@ -9,8 +9,8 @@ import type { Outpoint } from '@/core/adapters/chain/types';
 import { quickEstimate } from '@/core/planner';
 import { formatBchAmount, formatTokenAmount } from '@/core/utxo';
 
-import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
-import { useWallet } from '@/ui/wallet/usePaytacaWallet';
+import { connectWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/useWallet';
 
 export function FundingStep() {
   const { activeCampaign, updateCampaignFunding } = useAirdropStore();
@@ -128,7 +128,7 @@ export function FundingStep() {
       const sourceWallet =
         existingWallet ??
         (await addWatchOnlyWallet(
-          `Paytaca ${address.slice(0, 8)}...${address.slice(-6)}`,
+          `Wallet ${address.slice(0, 8)}...${address.slice(-6)}`,
           address,
           activeCampaign.network
         ));
@@ -158,7 +158,7 @@ export function FundingStep() {
     setLocalError(null);
     try {
       setIsConnecting(true);
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      await connectWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     } finally {
@@ -288,7 +288,7 @@ export function FundingStep() {
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               {effectiveExtensionAddress
                 ? `Connected: ${effectiveExtensionAddress}`
-                : 'Connect Paytaca wallet to select source address automatically.'}
+                : 'Connect Wallet wallet to select source address automatically.'}
             </p>
           </div>
           {!isConnected ? (
@@ -298,7 +298,7 @@ export function FundingStep() {
               disabled={isConnecting}
               className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isConnecting ? 'Connecting...' : 'Connect Paytaca'}
+              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
             </button>
           ) : null}
         </div>
@@ -326,7 +326,7 @@ export function FundingStep() {
       {!currentWalletAddress && (
         <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/50">
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Source wallet is required. Connect Paytaca extension to continue.
+            Source wallet is required. Connect Wallet extension to continue.
           </p>
         </div>
       )}

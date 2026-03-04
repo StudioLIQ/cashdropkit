@@ -13,10 +13,8 @@ import type { Network } from '@/core/db/types';
 
 import { useWalletConnect } from '@/ui/providers/ExtensionWalletProvider';
 
-import { type PaytacaProvider, connectPaytacaDirect, getPaytacaProvider } from './paytacaDirect';
-
 // ---------------------------------------------------------------------------
-// Types (previously imported from bch-connect)
+// Types
 // ---------------------------------------------------------------------------
 
 export interface WcSignTransactionRequest {
@@ -26,38 +24,25 @@ export interface WcSignTransactionRequest {
   userPrompt?: string;
 }
 
-export interface PaytacaSignTransactionRequest {
+export interface SignTransactionRequest {
   txRequest: WcSignTransactionRequest;
 }
 
-export interface PaytacaSignTransactionResponse {
+export interface SignTransactionResponse {
   signedTransaction: string;
   signedTransactionHash: string;
 }
 
 // ---------------------------------------------------------------------------
-// Module-level direct provider reference
-// Shared between useWallet and useSignTransaction hooks.
-// ---------------------------------------------------------------------------
-
-let _directProvider: PaytacaProvider | null = null;
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Extract the BCH address from a CAIP-10 account string.
- * Format: "bch:bchtest:qz..." → "bchtest:qz..."
- */
+/** Extract BCH address from CAIP-10 account: "bch:bchtest:qz..." → "bchtest:qz..." */
 function extractAddressFromCaip10(account: string): string {
   return account.replace(/^bch:/, '');
 }
 
-/**
- * Derive a token-aware CashAddress from a standard CashAddress.
- * Input like "bchtest:qz..." → "bchtest:zz..." (with tokenSupport).
- */
+/** Derive token-aware CashAddress: "bchtest:qz..." → "bchtest:zz..." */
 function deriveTokenAddress(address: string): string | null {
   try {
     const result = cashAddressToLockingBytecode(address);
@@ -90,7 +75,7 @@ async function ensureRelayConnected(
 // ---------------------------------------------------------------------------
 
 export function useWallet(_network?: Network) {
-  void _network; // network is controlled by the provider context
+  void _network;
 
   const {
     signClient,
@@ -103,12 +88,8 @@ export function useWallet(_network?: Network) {
 
   const { setConnectedAddress, clearConnectedAddress } = useExtensionWalletStore();
 
-  // WC session means connected via WalletConnect.
-  // Direct provider means connected via window.paytaca.
-  // Downstream consumers also check extensionWalletStore.connectedAddress.
   const isConnected = session !== null;
 
-  // Extract address from WC session
   const address = useMemo(() => {
     if (!session) return null;
     const accounts = session.namespaces?.bch?.accounts;
@@ -116,7 +97,6 @@ export function useWallet(_network?: Network) {
     return extractAddressFromCaip10(accounts[0]);
   }, [session]);
 
-  // Derive token address
   const tokenAddress = useMemo(() => {
     if (!address) return null;
     return deriveTokenAddress(address);
@@ -124,37 +104,18 @@ export function useWallet(_network?: Network) {
 
   const effectiveAddress = tokenAddress || address || null;
 
-  // Sync WC session address to extension wallet store
   useEffect(() => {
     if (effectiveAddress) {
       setConnectedAddress(effectiveAddress);
-    } else if (!_directProvider) {
-      // Only clear if we're also not connected via direct provider
+    } else {
       clearConnectedAddress();
     }
   }, [effectiveAddress, setConnectedAddress, clearConnectedAddress]);
 
-  // Connect: try direct extension provider first, WalletConnect as fallback
   const connect = useCallback(async () => {
-    // 1. Try direct provider (window.paytaca) — no relay needed
-    try {
-      console.log('[Wallet] Trying direct extension provider...');
-      const directAddress = await connectPaytacaDirect(network);
-      if (directAddress) {
-        _directProvider = getPaytacaProvider();
-        setConnectedAddress(directAddress);
-        console.log('[Wallet] Connected via direct provider:', directAddress);
-        return;
-      }
-    } catch (err) {
-      console.log('[Wallet] Direct provider failed, falling back to WC:', err);
-    }
-
-    // 2. Fall back to WalletConnect (opens modal with QR/extension link)
     if (connectError) {
       throw connectError;
     }
-
     try {
       await wcConnect();
     } catch (error) {
@@ -181,22 +142,13 @@ export function useWallet(_network?: Network) {
       }
       throw error;
     }
-  }, [connectError, wcConnect, network, setConnectedAddress]);
+  }, [connectError, wcConnect]);
 
-  // Disconnect
   const disconnect = useCallback(async () => {
-    if (_directProvider) {
-      console.log('[Wallet] Disconnecting direct provider');
-      _directProvider = null;
-      clearConnectedAddress();
-      return;
-    }
     await wcDisconnect();
-  }, [wcDisconnect, clearConnectedAddress]);
+  }, [wcDisconnect]);
 
-  // Refetch addresses (WC only — direct provider address is static)
   const refetchAddresses = useCallback(async () => {
-    if (_directProvider) return; // direct provider: address already known
     if (!signClient || !session) return;
     try {
       await ensureRelayConnected(signClient);
@@ -209,7 +161,7 @@ export function useWallet(_network?: Network) {
         },
       });
     } catch {
-      // best-effort; address is already available from session
+      // best-effort
     }
   }, [signClient, session, network]);
 
@@ -233,21 +185,7 @@ export function useSignTransaction() {
   const { signClient, session, network } = useWalletConnect();
 
   const signTransaction = useCallback(
-    async ({
-      txRequest,
-    }: PaytacaSignTransactionRequest): Promise<PaytacaSignTransactionResponse | null> => {
-      // 1. Try direct provider (in-process, no serialization needed)
-      if (_directProvider?.signTransaction) {
-        console.log('[Wallet] Signing via direct provider');
-        const result = await _directProvider.signTransaction(txRequest);
-        if (!result) return null;
-        return {
-          signedTransaction: result.signedTransaction,
-          signedTransactionHash: result.signedTransactionHash,
-        };
-      }
-
-      // 2. Fall back to WalletConnect
+    async ({ txRequest }: SignTransactionRequest): Promise<SignTransactionResponse | null> => {
       if (!signClient || !session) {
         throw new Error('Wallet is not connected');
       }
@@ -255,9 +193,6 @@ export function useSignTransaction() {
       await ensureRelayConnected(signClient);
 
       const chainId = `bch:${network === 'mainnet' ? 'bitcoincash' : 'bchtest'}`;
-
-      // Use libauth's stringify to serialize BigInt/Uint8Array values,
-      // then parse back for clean JSON-RPC transport.
       const serializedParams = JSON.parse(stringify(txRequest));
 
       const result = await signClient.request<{
@@ -273,7 +208,6 @@ export function useSignTransaction() {
         expiry: 300,
       });
 
-      // Paytaca sometimes returns an empty object on rejection
       if (
         !result ||
         (typeof result === 'object' && !result.signedTransaction && !result.signedTransactionHash)

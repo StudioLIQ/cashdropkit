@@ -8,8 +8,8 @@ import { settingsRepo } from '@/core/db';
 import type { Network } from '@/core/db/types';
 
 import { WalletListCard } from '@/ui/components/wallet';
-import { connectPaytacaWithGuard } from '@/ui/wallet/connectGuard';
-import { useWallet } from '@/ui/wallet/usePaytacaWallet';
+import { connectWithGuard } from '@/ui/wallet/connectGuard';
+import { useWallet } from '@/ui/wallet/useWallet';
 
 export default function WalletsPage() {
   const {
@@ -63,7 +63,7 @@ export default function WalletsPage() {
       }
 
       const short = `${address.slice(0, 8)}...${address.slice(-6)}`;
-      const wallet = await addWatchOnlyWallet(`Paytaca ${short}`, address, network);
+      const wallet = await addWatchOnlyWallet(`Wallet ${short}`, address, network);
       await selectWallet(wallet.id);
     },
     [wallets, selectWallet, addWatchOnlyWallet, network]
@@ -80,7 +80,7 @@ export default function WalletsPage() {
   const handleConnect = useCallback(async () => {
     setLocalError(null);
     try {
-      await connectPaytacaWithGuard({ connect, refetchAddresses });
+      await connectWithGuard({ connect, refetchAddresses });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to connect extension wallet');
     }
@@ -106,7 +106,7 @@ export default function WalletsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Wallets</h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Connect Paytaca and CashDrop will auto-register/select the wallet address.
+            Connect Wallet and CashDrop will auto-register/select the wallet address.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export default function WalletsPage() {
               onClick={handleConnect}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
             >
-              Connect Paytaca
+              Connect Wallet
             </button>
           ) : (
             <button
@@ -179,7 +179,7 @@ export default function WalletsPage() {
               No wallets yet
             </h3>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Connect Paytaca wallet to auto-register your address.
+              Connect Wallet wallet to auto-register your address.
             </p>
           </div>
         </div>
