@@ -1,22 +1,12 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { SessionTypes } from '@walletconnect/types';
 
 import type { Network } from '@/core/db/types';
 
-import {
-  PaytacaConnectModal,
-  emitModalState,
-} from '@/ui/wallet/PaytacaConnectModal';
+import { PaytacaConnectModal, emitModalState } from '@/ui/wallet/PaytacaConnectModal';
 
 // ---------------------------------------------------------------------------
 // BCH WalletConnect namespace constants
@@ -27,11 +17,7 @@ const BCH_CHAINS: Record<Network, string> = {
   mainnet: 'bch:bitcoincash',
 };
 
-const BCH_METHODS = [
-  'bch_getAddresses',
-  'bch_signTransaction',
-  'bch_signMessage',
-] as const;
+const BCH_METHODS = ['bch_getAddresses', 'bch_signTransaction', 'bch_signMessage'] as const;
 
 const BCH_EVENTS = ['addressesChanged'] as const;
 
@@ -39,9 +25,7 @@ const BCH_EVENTS = ['addressesChanged'] as const;
 // Context
 // ---------------------------------------------------------------------------
 
-type SignClient = Awaited<
-  ReturnType<typeof import('@walletconnect/sign-client').SignClient.init>
->;
+type SignClient = Awaited<ReturnType<typeof import('@walletconnect/sign-client').SignClient.init>>;
 
 export interface WalletConnectContextValue {
   signClient: SignClient | null;
@@ -80,7 +64,7 @@ function getProjectId(): string {
     console.error(
       '[CashDropKit] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set. ' +
         'Wallet connect will fail. Create a free project at https://cloud.reown.com ' +
-        'and add the ID to .env.local',
+        'and add the ID to .env.local'
     );
     return 'missing-project-id';
   }
@@ -95,15 +79,13 @@ const METADATA = {
 };
 
 // ---------------------------------------------------------------------------
-// Relay reconnection with exponential backoff (background only)
+// Relay reconnection
 // ---------------------------------------------------------------------------
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 
-/**
- * For user-initiated actions (connect, signTransaction): try once, fail fast.
- */
+/** Try once, fail fast — for user-initiated actions. */
 async function ensureRelayConnected(client: SignClient): Promise<void> {
   const relayer = client.core.relayer as {
     connected: boolean;
@@ -111,19 +93,36 @@ async function ensureRelayConnected(client: SignClient): Promise<void> {
   };
   if (relayer.connected) return;
 
+  console.log('[WC] Relay not connected, restarting transport...');
   try {
     await relayer.restartTransport();
   } catch (err) {
     throw new Error(
       `Relay connection failed: ${err instanceof Error ? err.message : 'unknown error'}. ` +
-        'Check your network and try again.',
+        'Check your network and try again.'
     );
   }
 
   if (!relayer.connected) {
-    throw new Error(
-      'Unable to connect to WalletConnect relay. Check your network and try again.',
-    );
+    throw new Error('Unable to connect to WalletConnect relay. Check your network and try again.');
+  }
+  console.log('[WC] Relay reconnected');
+}
+
+/** Disconnect ALL pairings so next connect() always gets a fresh URI. */
+async function disconnectAllPairings(client: SignClient): Promise<void> {
+  try {
+    const pairings = client.core.pairing.getPairings();
+    console.log(`[WC] Cleaning up ${pairings.length} pairings`);
+    for (const pairing of pairings) {
+      try {
+        await client.core.pairing.disconnect({ topic: pairing.topic });
+      } catch {
+        // ignore individual pairing cleanup errors
+      }
+    }
+  } catch {
+    // pairing cleanup is best-effort
   }
 }
 
@@ -142,9 +141,7 @@ export function ExtensionWalletProvider({
   const [connectError, setConnectError] = useState<Error | null>(null);
   const [disconnectError, setDisconnectError] = useState<Error | null>(null);
   const initRef = useRef(false);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // ---- Lazy SignClient init (SSR-safe via dynamic import) ----
   useEffect(() => {
@@ -210,7 +207,7 @@ export function ExtensionWalletProvider({
             try {
               await relayer.restartTransport();
               if (relayer.connected) {
-                console.log('[WC] Relay reconnected');
+                console.log('[WC] Relay reconnected (background)');
                 reconnectTimerRef.current = undefined;
                 return;
               }
@@ -231,9 +228,7 @@ export function ExtensionWalletProvider({
         console.error('[WC] SignClient init failed:', err);
         if (!cancelled) {
           setConnectError(
-            err instanceof Error
-              ? err
-              : new Error('Failed to initialize SignClient'),
+            err instanceof Error ? err : new Error('Failed to initialize SignClient')
           );
         }
       }
@@ -256,37 +251,20 @@ export function ExtensionWalletProvider({
   // ---- Connect ----
   const connect = useCallback(async () => {
     if (!signClient) {
-      throw new Error(
-        'Wallet provider is still initialising. Please wait a moment and try again.',
-      );
+      throw new Error('Wallet provider is still initialising. Please wait a moment and try again.');
     }
 
     setConnectError(null);
 
-    // Ensure relay is connected (try once, fail fast)
+    // 1. Ensure relay is connected
     await ensureRelayConnected(signClient);
 
-    // Clean up stale pairings
-    try {
-      const pairings = signClient.core.pairing.getPairings();
-      for (const pairing of pairings) {
-        if (
-          !pairing.active ||
-          (pairing.expiry && pairing.expiry * 1000 < Date.now())
-        ) {
-          try {
-            await signClient.core.pairing.disconnect({
-              topic: pairing.topic,
-            });
-          } catch {
-            // ignore cleanup errors
-          }
-        }
-      }
-    } catch {
-      // pairing cleanup is best-effort
-    }
+    // 2. Disconnect ALL existing pairings → forces fresh URI every time.
+    //    Stale pairings cause signClient.connect() to reuse them and return
+    //    no URI, which means the modal never opens.
+    await disconnectAllPairings(signClient);
 
+    // 3. Connect with fresh pairing
     const chainId = BCH_CHAINS[network];
     console.log('[WC] Connecting with chain:', chainId);
 
@@ -300,12 +278,17 @@ export function ExtensionWalletProvider({
       },
     });
 
-    console.log('[WC] Got URI:', uri ? 'yes' : 'no');
+    console.log('[WC] Got URI:', uri ? `yes (${uri.length} chars)` : 'NO — this is a bug');
 
-    if (uri) {
-      emitModalState({ isOpen: true, uri });
+    // 4. Open modal
+    if (!uri) {
+      throw new Error(
+        'WalletConnect did not generate a pairing URI. Please refresh the page and try again.'
+      );
     }
+    emitModalState({ isOpen: true, uri });
 
+    // 5. Await wallet approval
     try {
       const approved = await approval();
       console.log('[WC] Session approved:', approved.topic);
@@ -326,9 +309,7 @@ export function ExtensionWalletProvider({
         reason: { code: 6000, message: 'User disconnected' },
       });
     } catch (err) {
-      setDisconnectError(
-        err instanceof Error ? err : new Error('Failed to disconnect'),
-      );
+      setDisconnectError(err instanceof Error ? err : new Error('Failed to disconnect'));
     }
     setSession(null);
   }, [signClient, session]);

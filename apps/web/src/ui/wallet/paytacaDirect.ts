@@ -39,11 +39,11 @@ function isPaytacaProvider(
 ): provider is PaytacaProvider {
   return Boolean(
     provider &&
-      (provider.connect ||
-        provider.enable ||
-        provider.request ||
-        provider.getAddress ||
-        provider.getAddresses)
+    (provider.connect ||
+      provider.enable ||
+      provider.request ||
+      provider.getAddress ||
+      provider.getAddresses)
   );
 }
 
@@ -179,7 +179,11 @@ export async function connectPaytacaDirect(network: Network = 'testnet'): Promis
 
     for (const args of requestMethods) {
       try {
-        response = (await provider.request(args)) as PaytacaConnectResult | string | string[] | undefined;
+        response = (await provider.request(args)) as
+          | PaytacaConnectResult
+          | string
+          | string[]
+          | undefined;
         if (response) break;
       } catch {
         // Try next known account-read method.
@@ -198,7 +202,11 @@ export async function connectPaytacaDirect(network: Network = 'testnet'): Promis
   } else if (response?.address) {
     address = response.address;
   } else if (response && typeof response === 'object') {
-    const objectResponse = response as { result?: string[]; addresses?: string[]; account?: string };
+    const objectResponse = response as {
+      result?: string[];
+      addresses?: string[];
+      account?: string;
+    };
     address = objectResponse.addresses?.[0] ?? objectResponse.result?.[0] ?? objectResponse.account;
   }
 
@@ -216,7 +224,9 @@ export async function connectPaytacaDirect(network: Network = 'testnet'): Promis
   }
 
   if (!address) {
-    throw new Error('Paytaca did not return a wallet address. Approve the request in the extension and try again.');
+    throw new Error(
+      'Paytaca did not return a wallet address. Approve the request in the extension and try again.'
+    );
   }
 
   return normalizeToNetwork(address, network);

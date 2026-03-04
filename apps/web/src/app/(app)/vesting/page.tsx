@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 
 import Link from 'next/link';
 
-import { getVestingRepo, type VestingCampaign } from '@/core/db';
 import { useConnectionStore } from '@/stores';
+
+import { type VestingCampaign, getVestingRepo } from '@/core/db';
 
 function getCampaignStatus(campaign: VestingCampaign): string {
   const state = campaign.execution?.state;
@@ -114,7 +115,10 @@ export default function VestingPage() {
               <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-500 dark:text-zinc-400">
                 <span>Template: {campaign.template}</span>
                 <span>Beneficiaries: {campaign.beneficiaries.length}</span>
-                <span>Token: {campaign.token.tokenId ? `${campaign.token.tokenId.slice(0, 12)}...` : 'Unset'}</span>
+                <span>
+                  Token:{' '}
+                  {campaign.token.tokenId ? `${campaign.token.tokenId.slice(0, 12)}...` : 'Unset'}
+                </span>
               </div>
             </div>
           ))}

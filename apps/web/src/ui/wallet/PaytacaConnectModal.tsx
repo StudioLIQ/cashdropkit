@@ -103,8 +103,9 @@ function encodeQr(text: string): boolean[][] {
   }
 
   // Place modules
-  const grid: (boolean | null)[][] = Array.from({ length: size }, () =>
-    Array(size).fill(null) as (boolean | null)[],
+  const grid: (boolean | null)[][] = Array.from(
+    { length: size },
+    () => Array(size).fill(null) as (boolean | null)[]
   );
   const reserved: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
 
@@ -156,9 +157,9 @@ function bitsToBytes(bits: number[]): number[] {
 
 // Version selection for byte mode, ECC L
 const CAPACITY_L = [
-  0, 17, 32, 53, 78, 106, 134, 154, 192, 230, 271, 321, 367, 425, 458, 520, 586, 644, 718, 792,
-  858, 929, 1003, 1091, 1171, 1273, 1367, 1465, 1528, 1628, 1732, 1840, 1952, 2068, 2188, 2303,
-  2431, 2563, 2699, 2809, 2953,
+  0, 17, 32, 53, 78, 106, 134, 154, 192, 230, 271, 321, 367, 425, 458, 520, 586, 644, 718, 792, 858,
+  929, 1003, 1091, 1171, 1273, 1367, 1465, 1528, 1628, 1732, 1840, 1952, 2068, 2188, 2303, 2431,
+  2563, 2699, 2809, 2953,
 ];
 
 function pickVersion(dataLen: number): number {
@@ -206,8 +207,8 @@ function splitBlocks(data: number[], version: number): number[][] {
 }
 
 const EC_PER_BLOCK_L: number[] = [
-  0, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30,
-  30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
+  0, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30,
+  26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
 ];
 
 // GF(256) Reed-Solomon
@@ -254,11 +255,7 @@ function reedSolomon(data: number[], ecCount: number): number[] {
 }
 
 // Finder patterns
-function placeFinders(
-  grid: (boolean | null)[][],
-  reserved: boolean[][],
-  size: number,
-) {
+function placeFinders(grid: (boolean | null)[][], reserved: boolean[][], size: number) {
   const positions = [
     [0, 0],
     [0, size - 7],
@@ -273,8 +270,7 @@ function placeFinders(
         reserved[row][col] = true;
         const inOuter = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
         const inInner = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
-        const onBorder =
-          dr === 0 || dr === 6 || dc === 0 || dc === 6;
+        const onBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
         grid[row][col] = inOuter ? inInner || onBorder : false;
       }
     }
@@ -330,7 +326,7 @@ function placeAlignments(
   grid: (boolean | null)[][],
   reserved: boolean[][],
   version: number,
-  size: number,
+  size: number
 ) {
   if (version < 2) return;
   const pos = ALIGNMENT_POSITIONS[version];
@@ -343,19 +339,14 @@ function placeAlignments(
           const row = r + dr;
           const col = c + dc;
           reserved[row][col] = true;
-          grid[row][col] =
-            Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
+          grid[row][col] = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
         }
       }
     }
   }
 }
 
-function placeTiming(
-  grid: (boolean | null)[][],
-  reserved: boolean[][],
-  size: number,
-) {
+function placeTiming(grid: (boolean | null)[][], reserved: boolean[][], size: number) {
   for (let i = 8; i < size - 8; i++) {
     if (!reserved[6][i]) {
       grid[6][i] = i % 2 === 0;
@@ -391,7 +382,7 @@ function placeData(
   grid: (boolean | null)[][],
   reserved: boolean[][],
   data: number[],
-  size: number,
+  size: number
 ) {
   const bits: number[] = [];
   for (const byte of data) {
@@ -420,7 +411,7 @@ function applyMask(
   grid: (boolean | null)[][],
   reserved: boolean[][],
   size: number,
-  mask: number,
+  mask: number
 ): (boolean | null)[][] {
   const result = grid.map((row) => [...row]);
   for (let r = 0; r < size; r++) {
@@ -490,11 +481,7 @@ function penalty(grid: (boolean | null)[][], size: number): number {
   for (let r = 0; r < size - 1; r++) {
     for (let c = 0; c < size - 1; c++) {
       const val = grid[r][c];
-      if (
-        grid[r][c + 1] === val &&
-        grid[r + 1][c] === val &&
-        grid[r + 1][c + 1] === val
-      ) {
+      if (grid[r][c + 1] === val && grid[r + 1][c] === val && grid[r + 1][c + 1] === val) {
         score += 3;
       }
     }
@@ -502,35 +489,74 @@ function penalty(grid: (boolean | null)[][], size: number): number {
   return score;
 }
 
-const FORMAT_BITS_L: number[] = [
-  0x77c4, 0x72f3, 0x7daa, 0x789d, 0x662f, 0x6318, 0x6c41, 0x6976,
-];
+const FORMAT_BITS_L: number[] = [0x77c4, 0x72f3, 0x7daa, 0x789d, 0x662f, 0x6318, 0x6c41, 0x6976];
 
-function writeFormatBits(
-  grid: (boolean | null)[][],
-  mask: number,
-  size: number,
-) {
+function writeFormatBits(grid: (boolean | null)[][], mask: number, size: number) {
   const bits = FORMAT_BITS_L[mask];
   // Horizontal: row 8
-  const hPositions = [0, 1, 2, 3, 4, 5, 7, 8, size - 8, size - 7, size - 6, size - 5, size - 4, size - 3, size - 2, size - 1];
+  const hPositions = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    size - 8,
+    size - 7,
+    size - 6,
+    size - 5,
+    size - 4,
+    size - 3,
+    size - 2,
+    size - 1,
+  ];
   for (let i = 0; i < 15; i++) {
     grid[8][hPositions[i]] = ((bits >> (14 - i)) & 1) === 1;
   }
   // Vertical: col 8
-  const vPositions = [0, 1, 2, 3, 4, 5, 7, 8, size - 7, size - 6, size - 5, size - 4, size - 3, size - 2, size - 1];
+  const vPositions = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    size - 7,
+    size - 6,
+    size - 5,
+    size - 4,
+    size - 3,
+    size - 2,
+    size - 1,
+  ];
   // The vertical format info runs from bottom at positions listed
-  const vMap = [size - 1, size - 2, size - 3, size - 4, size - 5, size - 6, size - 7, 8, 7, 5, 4, 3, 2, 1, 0];
+  const vMap = [
+    size - 1,
+    size - 2,
+    size - 3,
+    size - 4,
+    size - 5,
+    size - 6,
+    size - 7,
+    8,
+    7,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+  ];
   for (let i = 0; i < 15; i++) {
     grid[vMap[i]][8] = ((bits >> (14 - i)) & 1) === 1;
   }
 }
 
-function writeVersionBits(
-  grid: (boolean | null)[][],
-  version: number,
-  size: number,
-) {
+function writeVersionBits(grid: (boolean | null)[][], version: number, size: number) {
   if (version < 7) return;
   const VERSION_INFO: number[] = [
     0, 0, 0, 0, 0, 0, 0, 0x07c94, 0x085bc, 0x09a99, 0x0a4d3, 0x0bbf6, 0x0c762, 0x0d847, 0x0e60d,
@@ -599,7 +625,10 @@ export function PaytacaConnectModal() {
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    setExtensionDetected(null);
+    // Reset detection state asynchronously to avoid synchronous setState in effect
+    queueMicrotask(() => {
+      if (!cancelled) setExtensionDetected(null);
+    });
     isPaytacaExtensionInstalled(1500).then((detected) => {
       if (!cancelled) setExtensionDetected(detected);
     });
@@ -652,9 +681,7 @@ export function PaytacaConnectModal() {
       <div className="flex flex-col items-center gap-5">
         {/* Header */}
         <div className="flex w-full items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-100">
-            Connect Wallet
-          </h2>
+          <h2 className="text-lg font-semibold text-zinc-100">Connect Wallet</h2>
           <button
             onClick={handleClose}
             className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
@@ -757,19 +784,8 @@ export function PaytacaConnectModal() {
 
 function Spinner() {
   return (
-    <svg
-      className="h-5 w-5 animate-spin text-zinc-400"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        className="opacity-25"
-      />
+    <svg className="h-5 w-5 animate-spin text-zinc-400" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
       <path
         d="M12 2a10 10 0 0 1 10 10"
         stroke="currentColor"
@@ -785,7 +801,12 @@ function ClipboardIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="5" y="2" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M3 5v7.5A1.5 1.5 0 0 0 4.5 14H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path
+        d="M3 5v7.5A1.5 1.5 0 0 0 4.5 14H10"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

@@ -5,8 +5,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { getVestingRepo, type VestingCampaign } from '@/core/db';
 import { useConnectionStore } from '@/stores';
+
+import { type VestingCampaign, getVestingRepo } from '@/core/db';
 
 export default function NewVestingPage() {
   const router = useRouter();

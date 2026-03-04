@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo } from 'react';
 
+import { useExtensionWalletStore } from '@/stores';
 import {
   cashAddressToLockingBytecode,
   lockingBytecodeToCashAddress,
   stringify,
 } from '@bitauth/libauth';
-
-import { useExtensionWalletStore } from '@/stores';
 
 import type { Network } from '@/core/db/types';
 
@@ -39,29 +38,10 @@ export interface PaytacaSignTransactionResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * Purge stale WalletConnect v2 data from localStorage so that a fresh
- * pairing can be established without "Subscribing to <topic> failed" errors
- * caused by leftover sessions/pairings from previous attempts.
- */
-function clearStaleWcStorage(): void {
-  try {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.startsWith('wc@')) {
-        localStorage.removeItem(key);
-      }
-    }
-  } catch {
-    // Storage access may fail in some contexts; not critical.
-  }
-}
-
-/**
  * Extract the BCH address from a CAIP-10 account string.
  * Format: "bch:bchtest:qz..." → "bchtest:qz..."
  */
 function extractAddressFromCaip10(account: string): string {
-  // Remove the "bch:" prefix → "bchtest:qz..."
   return account.replace(/^bch:/, '');
 }
 
@@ -72,7 +52,7 @@ function extractAddressFromCaip10(account: string): string {
 function deriveTokenAddress(address: string): string | null {
   try {
     const result = cashAddressToLockingBytecode(address);
-    if (typeof result === 'string') return null; // error string
+    if (typeof result === 'string') return null;
     const tokenAddr = lockingBytecodeToCashAddress({
       bytecode: result.bytecode,
       prefix: result.prefix,
@@ -86,7 +66,7 @@ function deriveTokenAddress(address: string): string | null {
 }
 
 async function ensureRelayConnected(
-  signClient: NonNullable<ReturnType<typeof useWalletConnect>['signClient']>,
+  signClient: NonNullable<ReturnType<typeof useWalletConnect>['signClient']>
 ): Promise<void> {
   const relayer = signClient.core.relayer as {
     connected: boolean;
@@ -100,7 +80,9 @@ async function ensureRelayConnected(
 // useWallet
 // ---------------------------------------------------------------------------
 
-export function useWallet(_network: Network = 'testnet') {
+export function useWallet(_network?: Network) {
+  void _network; // network is controlled by the provider context
+
   const {
     signClient,
     session,
@@ -110,8 +92,7 @@ export function useWallet(_network: Network = 'testnet') {
     disconnect: wcDisconnect,
   } = useWalletConnect();
 
-  const { setConnectedAddress, clearConnectedAddress } =
-    useExtensionWalletStore();
+  const { setConnectedAddress, clearConnectedAddress } = useExtensionWalletStore();
 
   const isConnected = session !== null;
 
@@ -146,25 +127,16 @@ export function useWallet(_network: Network = 'testnet') {
       throw connectError;
     }
 
-    clearStaleWcStorage();
-
     try {
       await wcConnect();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'string'
-            ? error
-            : '';
+        error instanceof Error ? error.message : typeof error === 'string' ? error : '';
       const lowered = message.toLowerCase();
 
-      if (
-        lowered.includes('origin not allowed') ||
-        lowered.includes('unauthorized')
-      ) {
+      if (lowered.includes('origin not allowed') || lowered.includes('unauthorized')) {
         throw new Error(
-          'WalletConnect relay rejected this origin. Set a valid NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env.local (create one free at https://cloud.reown.com).',
+          'WalletConnect relay rejected this origin. Set a valid NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env.local (create one free at https://cloud.reown.com).'
         );
       }
       if (
@@ -173,14 +145,11 @@ export function useWallet(_network: Network = 'testnet') {
         lowered.includes('interrupted while trying to subscribe')
       ) {
         throw new Error(
-          'Unable to reach the wallet relay. Check NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID and retry.',
+          'Unable to reach the wallet relay. Check NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID and retry.'
         );
       }
       if (lowered.includes('subscribing') && lowered.includes('failed')) {
-        clearStaleWcStorage();
-        throw new Error(
-          'Relay subscription failed. Stale session data has been cleared — please refresh the page and try again.',
-        );
+        throw new Error('Relay subscription failed. Please refresh the page and try again.');
       }
       throw error;
     }
@@ -261,9 +230,7 @@ export function useSignTransaction() {
       // Paytaca sometimes returns an empty object on rejection
       if (
         !result ||
-        (typeof result === 'object' &&
-          !result.signedTransaction &&
-          !result.signedTransactionHash)
+        (typeof result === 'object' && !result.signedTransaction && !result.signedTransactionHash)
       ) {
         return null;
       }
@@ -273,7 +240,7 @@ export function useSignTransaction() {
         signedTransactionHash: result.signedTransactionHash!,
       };
     },
-    [signClient, session, network],
+    [signClient, session, network]
   );
 
   return { signTransaction };
