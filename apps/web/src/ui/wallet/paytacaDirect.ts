@@ -8,7 +8,7 @@ interface PaytacaConnectResult {
   address?: string;
 }
 
-interface PaytacaProvider {
+export interface PaytacaProvider {
   connect?: () => Promise<PaytacaConnectResult | string | undefined>;
   enable?: () => Promise<PaytacaConnectResult | string | string[] | undefined>;
   getAddress?: () => Promise<string | undefined>;

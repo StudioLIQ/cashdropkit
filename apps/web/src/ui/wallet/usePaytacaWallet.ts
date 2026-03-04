@@ -13,6 +13,8 @@ import type { Network } from '@/core/db/types';
 
 import { useWalletConnect } from '@/ui/providers/ExtensionWalletProvider';
 
+import { type PaytacaProvider, connectPaytacaDirect, getPaytacaProvider } from './paytacaDirect';
+
 // ---------------------------------------------------------------------------
 // Types (previously imported from bch-connect)
 // ---------------------------------------------------------------------------
@@ -32,6 +34,13 @@ export interface PaytacaSignTransactionResponse {
   signedTransaction: string;
   signedTransactionHash: string;
 }
+
+// ---------------------------------------------------------------------------
+// Module-level direct provider reference
+// Shared between useWallet and useSignTransaction hooks.
+// ---------------------------------------------------------------------------
+
+let _directProvider: PaytacaProvider | null = null;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,9 +103,12 @@ export function useWallet(_network?: Network) {
 
   const { setConnectedAddress, clearConnectedAddress } = useExtensionWalletStore();
 
+  // WC session means connected via WalletConnect.
+  // Direct provider means connected via window.paytaca.
+  // Downstream consumers also check extensionWalletStore.connectedAddress.
   const isConnected = session !== null;
 
-  // Extract address from session
+  // Extract address from WC session
   const address = useMemo(() => {
     if (!session) return null;
     const accounts = session.namespaces?.bch?.accounts;
@@ -112,17 +124,33 @@ export function useWallet(_network?: Network) {
 
   const effectiveAddress = tokenAddress || address || null;
 
-  // Sync to extension wallet store
+  // Sync WC session address to extension wallet store
   useEffect(() => {
     if (effectiveAddress) {
       setConnectedAddress(effectiveAddress);
-    } else {
+    } else if (!_directProvider) {
+      // Only clear if we're also not connected via direct provider
       clearConnectedAddress();
     }
   }, [effectiveAddress, setConnectedAddress, clearConnectedAddress]);
 
-  // Connect with error handling
+  // Connect: try direct extension provider first, WalletConnect as fallback
   const connect = useCallback(async () => {
+    // 1. Try direct provider (window.paytaca) — no relay needed
+    try {
+      console.log('[Wallet] Trying direct extension provider...');
+      const directAddress = await connectPaytacaDirect(network);
+      if (directAddress) {
+        _directProvider = getPaytacaProvider();
+        setConnectedAddress(directAddress);
+        console.log('[Wallet] Connected via direct provider:', directAddress);
+        return;
+      }
+    } catch (err) {
+      console.log('[Wallet] Direct provider failed, falling back to WC:', err);
+    }
+
+    // 2. Fall back to WalletConnect (opens modal with QR/extension link)
     if (connectError) {
       throw connectError;
     }
@@ -153,15 +181,22 @@ export function useWallet(_network?: Network) {
       }
       throw error;
     }
-  }, [connectError, wcConnect]);
+  }, [connectError, wcConnect, network, setConnectedAddress]);
 
   // Disconnect
   const disconnect = useCallback(async () => {
+    if (_directProvider) {
+      console.log('[Wallet] Disconnecting direct provider');
+      _directProvider = null;
+      clearConnectedAddress();
+      return;
+    }
     await wcDisconnect();
-  }, [wcDisconnect]);
+  }, [wcDisconnect, clearConnectedAddress]);
 
-  // Refetch addresses via bch_getAddresses
+  // Refetch addresses (WC only — direct provider address is static)
   const refetchAddresses = useCallback(async () => {
+    if (_directProvider) return; // direct provider: address already known
     if (!signClient || !session) return;
     try {
       await ensureRelayConnected(signClient);
@@ -201,11 +236,22 @@ export function useSignTransaction() {
     async ({
       txRequest,
     }: PaytacaSignTransactionRequest): Promise<PaytacaSignTransactionResponse | null> => {
+      // 1. Try direct provider (in-process, no serialization needed)
+      if (_directProvider?.signTransaction) {
+        console.log('[Wallet] Signing via direct provider');
+        const result = await _directProvider.signTransaction(txRequest);
+        if (!result) return null;
+        return {
+          signedTransaction: result.signedTransaction,
+          signedTransactionHash: result.signedTransactionHash,
+        };
+      }
+
+      // 2. Fall back to WalletConnect
       if (!signClient || !session) {
         throw new Error('Wallet is not connected');
       }
 
-      // Ensure relay is connected before sending request
       await ensureRelayConnected(signClient);
 
       const chainId = `bch:${network === 'mainnet' ? 'bitcoincash' : 'bchtest'}`;
